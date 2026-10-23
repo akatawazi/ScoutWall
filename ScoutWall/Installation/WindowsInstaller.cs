@@ -70,6 +70,9 @@ public static class WindowsInstaller
             runKey.SetValue(RunValueName, PresenceCommand(port));
         Installer.Step("Presence agent starts at every sign-in");
 
+        if (SetOnPath(add: true))
+            Installer.Step("Added to PATH: \"scoutwall\" works in new terminals");
+
         if (!File.Exists(Path.Combine(Environment.SystemDirectory, "Npcap", "wpcap.dll")))
             Installer.Step("Npcap isn't installed: using Windows' built-in packet capture (install Npcap from npcap.com for faster capture)");
 
@@ -112,6 +115,7 @@ public static class WindowsInstaller
         Installer.Run(Schtasks, "/Delete", "/TN", LegacyPresenceTaskName, "/F");
         using (var runKey = Registry.LocalMachine.OpenSubKey(RunKeyPath, writable: true))
             runKey?.DeleteValue(RunValueName, throwOnMissingValue: false);
+        SetOnPath(add: false);
         Installer.Step("Services, tasks and the sign-in agent removed");
 
         var dataFolder = ScoutWallPaths.DataFolder;
@@ -291,6 +295,34 @@ public static class WindowsInstaller
             Installer.Step("Scout appears in the notification area after your next sign-in");
         }
     }
+
+    /// <summary>
+    /// Adds the program folder to (or removes it from) the machine PATH, keeping the value's %VARIABLES% unexpanded,
+    /// and tells running programs the environment changed. Returns whether it changed anything.
+    /// </summary>
+    private static bool SetOnPath(bool add)
+    {
+        using var environmentKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Environment", writable: true);
+        if (environmentKey?.GetValue("Path", string.Empty, RegistryValueOptions.DoNotExpandEnvironmentNames) is not string path)
+            return false;
+
+        var entries = path.Split(';', StringSplitOptions.RemoveEmptyEntries).ToList();
+        var present = entries.Any(entry => string.Equals(entry.TrimEnd('\\'), InstallFolder, StringComparison.OrdinalIgnoreCase));
+        if (add == present)
+            return false;
+
+        if (add)
+            entries.Add(InstallFolder);
+        else
+            entries.RemoveAll(entry => string.Equals(entry.TrimEnd('\\'), InstallFolder, StringComparison.OrdinalIgnoreCase));
+
+        environmentKey.SetValue("Path", string.Join(';', entries), RegistryValueKind.ExpandString);
+        SendMessageTimeout(new IntPtr(0xFFFF), 0x001A, IntPtr.Zero, "Environment", 0x0002, 5000, out _);
+        return true;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern IntPtr SendMessageTimeout(IntPtr window, uint message, IntPtr wordParameter, string longParameter, uint flags, uint timeout, out IntPtr result);
 
     private static string PresenceCommand(int port)
     {

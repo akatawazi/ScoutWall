@@ -44,10 +44,12 @@ public class PresencePipeWorker : BackgroundService
             {
                 return;
             }
-            catch (IOException exception)
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
-                logger.LogWarning("Presence pipe could not be opened: {Message}", exception.Message);
-                await SensorWorker.DelayQuietly(TimeSpan.FromSeconds(30), stoppingToken);
+                // Usually another sensor (an installed one, or one left running) already owns the pipe name. The rest
+                // of the sensor keeps working; presence reports resume once the name is free.
+                logger.LogWarning("Presence pipe could not be opened (another ScoutWall sensor may be running): {Message}", exception.Message);
+                await SensorWorker.DelayQuietly(TimeSpan.FromMinutes(1), stoppingToken);
                 continue;
             }
 

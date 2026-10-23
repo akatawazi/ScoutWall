@@ -449,6 +449,12 @@ public class IntegrationSettings : ISettingsSection<IntegrationSettings>, IValid
     /// </summary>
     public bool UseIpApiFallback { get; set; }
 
+    /// <summary>
+    /// Ask GitHub once a day whether a newer ScoutWall has been released, to show a notice in the console.
+    /// Nothing about this computer is sent; the request is the same one a browser makes to the releases page.
+    /// </summary>
+    public bool CheckForUpdates { get; set; } = true;
+
     public List<string> BlocklistUrls { get; set; } =
     [
         "https://feodotracker.abuse.ch/downloads/ipblocklist.txt"

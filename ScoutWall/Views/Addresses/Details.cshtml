@@ -9,6 +9,10 @@
         <h1 class="h3 m-0 sw-mono">@profile.IpAddress</h1>
         <div class="text-body-secondary">
             @profile.LocationDisplay &middot; @profile.IspDisplay
+            @if (profile.LookupSource == "DB-IP")
+            {
+                <span class="small">&middot; <a href="https://db-ip.com" target="_blank" rel="noopener">IP geolocation by DB-IP</a></span>
+            }
             @if (profile.IsBlocklisted)
             {
                 <span class="badge bg-danger ms-1">Blocklisted by @profile.BlocklistSource</span>

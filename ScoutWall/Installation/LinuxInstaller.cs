@@ -17,6 +17,7 @@ public static class LinuxInstaller
     private const string WebUnit = "scoutwall-web.service";
     private const string SensorUnit = "scoutwall-sensor.service";
     private const string UnitFolder = "/etc/systemd/system";
+    private const string CommandLink = "/usr/local/bin/scoutwall";
 
     public static async Task Install(int port, bool start)
     {
@@ -111,6 +112,12 @@ public static class LinuxInstaller
         Installer.RunOrThrow("systemctl", "enable", WebUnit, SensorUnit);
         Installer.Step("systemd services installed: scoutwall-web and scoutwall-sensor");
 
+        if (!File.Exists(CommandLink))
+        {
+            File.CreateSymbolicLink(CommandLink, Executable);
+            Installer.Step($"Linked {CommandLink}: \"scoutwall\" works from any folder");
+        }
+
         if (!start)
         {
             Console.WriteLine("Installed. Start it with: systemctl start scoutwall-web scoutwall-sensor");
@@ -137,6 +144,8 @@ public static class LinuxInstaller
         }
 
         Installer.Run("systemctl", "daemon-reload");
+        if (new FileInfo(CommandLink).LinkTarget == Executable)
+            File.Delete(CommandLink);
         if (Directory.Exists(InstallFolder))
             Directory.Delete(InstallFolder, recursive: true);
         Installer.Step("Services and program removed");

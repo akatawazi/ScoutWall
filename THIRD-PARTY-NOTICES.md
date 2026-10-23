@@ -24,6 +24,12 @@ texts are included in each package or linked below.
 
 PacketDotNet is used unmodified under the Mozilla Public License 2.0; its source is available at the link above.
 
+## Downloaded by ScoutWall at run time
+
+| Component | License | Source |
+|---|---|---|
+| DB-IP Lite databases (city and ASN): the default location and network-owner data, downloaded monthly into the data folder | Creative Commons Attribution 4.0; credited as "IP geolocation by DB-IP" wherever locations are shown | https://db-ip.com |
+
 ## Not bundled: installed or downloaded by you
 
 These are never shipped with ScoutWall. Their own licenses apply when you choose to use them.
@@ -32,7 +38,7 @@ These are never shipped with ScoutWall. Their own licenses apply when you choose
 |---|---|
 | Npcap (https://npcap.com) | Optional faster capture on Windows. Free for personal use on up to five systems; redistribution needs an Npcap OEM license, so ScoutWall never bundles or downloads it. |
 | libpcap (https://www.tcpdump.org) | BSD license; installed from your Linux distribution. |
-| MaxMind GeoLite2 databases | Optional; you download them yourself under MaxMind's GeoLite2 EULA. |
+| MaxMind GeoLite2 databases | Optional; used instead of DB-IP when you set them in Settings. You download them yourself under MaxMind's GeoLite2 EULA. |
 | ip-api.com | Optional location lookups, off by default. Its free service is for non-commercial use only. |
 | Threat blocklists | Defaults to the abuse.ch Feodo Tracker list (CC0). Add others only if their terms allow your use. |
 | Wireshark / tshark | Optional, for decrypting your own TLS traffic; GPL-2.0, installed separately. |

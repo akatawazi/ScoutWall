@@ -71,6 +71,10 @@
     </header>
 
     <main role="main" class="container-fluid px-3 px-lg-4 py-4">
+        @if (isSignedIn)
+        {
+            <partial name="_UpdateNotice" />
+        }
         @if (TempData["Message"] is string message)
         {
             <div class="alert alert-success" role="status">@message</div>

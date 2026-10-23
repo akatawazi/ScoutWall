@@ -5,7 +5,7 @@
         <div class="card-header">Location and ISP lookup</div>
         <div class="card-body row g-3">
             <p class="small text-body-secondary mb-0">
-                For accurate offline lookups, download the free MaxMind GeoLite2 City and ASN databases (account required) and enter their paths.
+                ScoutWall looks up locations offline with DB-IP's free databases, which it downloads and updates by itself. To use MaxMind GeoLite2 instead (free with an account), download the City and ASN databases and enter their paths.
                 The ip-api.com fallback works without setup but is for non-commercial use only and sends addresses over plain HTTP.
             </p>
             <div class="col-md-6">
@@ -22,6 +22,20 @@
                     <label class="form-check-label" asp-for="Integration.UseIpApiFallback">Use ip-api.com when the databases cannot answer</label>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Updates</div>
+        <div class="card-body">
+            <div class="form-check form-switch">
+                <input class="form-check-input" asp-for="Integration.CheckForUpdates" />
+                <label class="form-check-label" asp-for="Integration.CheckForUpdates">Check GitHub once a day for a newer ScoutWall and show a notice</label>
+            </div>
+            <p class="small text-body-secondary mt-2 mb-0">
+                You're running ScoutWall @ScoutWall.Data.ScoutWallVersion.Current. To update, run <code>scoutwall update</code> as administrator (Windows) or with sudo (Linux);
+                it downloads the newest release, checks it and upgrades in place, keeping your data and settings.
+            </p>
         </div>
     </div>
 

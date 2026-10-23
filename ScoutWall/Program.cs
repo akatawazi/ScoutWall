@@ -30,6 +30,9 @@ switch (command)
     case "uninstall":
         return await Installer.Uninstall(rest);
 
+    case "update":
+        return await Updater.Update(rest);
+
     case "rescue":
         return await RescueCommand.Run(rest);
 
@@ -45,6 +48,7 @@ switch (command)
 
               install     Install or upgrade ScoutWall on this computer (administrator/root).
                           Options: --port 5215, --no-start
+              update      Download and install the newest release (administrator/root). --check only reports.
               uninstall   Remove ScoutWall. Add --delete-data to also delete its database and settings.
               rescue      Remove every ScoutWall firewall rule and undo Windows audit changes (administrator).
               web         Run the web console (what the "ScoutWall Web" service runs).

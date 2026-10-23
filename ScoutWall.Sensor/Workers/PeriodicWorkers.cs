@@ -212,6 +212,7 @@ public class EnrichmentWorker : SensorWorker
     private static readonly TimeSpan LookupLifetime = TimeSpan.FromDays(30);
 
     private readonly GeoIpResolver geoIpResolver = new();
+    private DbIpDatabases? dbIpDatabases;
     private readonly Dictionary<string, string> feedContents = [];
     private DateTime lastBlocklistRefresh = DateTime.MinValue;
     private string lastBlocklistSettings = string.Empty;
@@ -231,6 +232,12 @@ public class EnrichmentWorker : SensorWorker
     private async Task LookUpAddresses(CancellationToken cancellationToken)
     {
         var integrationSettings = SensorRuntime.Configuration.Integration;
+        if (string.IsNullOrWhiteSpace(integrationSettings.GeoIpCityDatabasePath) || string.IsNullOrWhiteSpace(integrationSettings.GeoIpAsnDatabasePath))
+        {
+            dbIpDatabases ??= new DbIpDatabases(Logger);
+            await dbIpDatabases.EnsureCurrent(cancellationToken);
+        }
+
         if (!geoIpResolver.HasSource(integrationSettings))
             return;
 
@@ -388,5 +395,54 @@ public class MaintenanceWorker : SensorWorker
 
         if (deletedCount > 0)
             Logger.LogInformation("Retention removed {Count} rows", deletedCount);
+    }
+}
+
+/// <summary>
+/// Asks GitHub every few hours for the newest ScoutWall release so the console can say when an update is out.
+/// A private repository answers "not found" without signing in, which is simply ignored.
+/// </summary>
+public class UpdateCheckWorker : SensorWorker
+{
+    private static readonly HttpClient HttpClient = CreateClient();
+
+    public UpdateCheckWorker(SensorRuntime sensorRuntime, ILogger<UpdateCheckWorker> logger) : base(sensorRuntime, logger)
+    {
+    }
+
+    protected override TimeSpan Interval => TimeSpan.FromHours(6);
+
+    protected override async Task RunOnce(CancellationToken cancellationToken)
+    {
+        if (!SensorRuntime.Configuration.Integration.CheckForUpdates)
+            return;
+
+        try
+        {
+            using var response = await HttpClient.GetAsync($"https://api.github.com/repos/{ScoutWallVersion.Repository}/releases/latest", cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return;
+
+            using var document = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+            var tag = document.RootElement.GetProperty("tag_name").GetString() ?? string.Empty;
+            var url = document.RootElement.GetProperty("html_url").GetString() ?? string.Empty;
+
+            await using var dataContext = SensorRuntime.CreateDataContext();
+            await new LatestRelease { Tag = tag, Url = url, CheckedAt = DateTime.UtcNow }.Save(dataContext);
+            if (ScoutWallVersion.IsNewer(tag))
+                Logger.LogInformation("ScoutWall {Version} is available (running {Current}); run \"scoutwall update\" to install it", tag, ScoutWallVersion.Current);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or KeyNotFoundException)
+        {
+            Logger.LogDebug("Update check failed: {Message}", exception.Message);
+        }
+    }
+
+    private static HttpClient CreateClient()
+    {
+        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd($"ScoutWall/{ScoutWallVersion.Current}");
+        client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+        return client;
     }
 }

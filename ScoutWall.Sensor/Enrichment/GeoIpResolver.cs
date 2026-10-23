@@ -6,9 +6,9 @@ using ScoutWall.Data.Models;
 namespace ScoutWall.Sensor.Enrichment;
 
 /// <summary>
-/// Looks up location, ISP and autonomous system for public addresses.
-/// MaxMind GeoLite2 databases (offline, free with an account) are preferred; ip-api.com is a fallback that is
-/// free for non-commercial use only and limited to 15 batch requests a minute.
+/// Looks up location, ISP and autonomous system for public addresses, offline. MaxMind GeoLite2 databases are used
+/// when configured in settings; otherwise DB-IP's free Lite databases, which ScoutWall downloads itself
+/// (<see cref="DbIpDatabases"/>). ip-api.com is an optional online fallback, free for non-commercial use only.
 /// </summary>
 public class GeoIpResolver : IDisposable
 {
@@ -19,6 +19,9 @@ public class GeoIpResolver : IDisposable
     private DatabaseReader? asnReader;
     private string? loadedCityPath;
     private string? loadedAsnPath;
+    private DateTime loadedCityWrite;
+    private DateTime loadedAsnWrite;
+    private string cityLookupSource = "MaxMind";
 
     public bool HasSource(IntegrationSettings integrationSettings)
     {
@@ -54,20 +57,32 @@ public class GeoIpResolver : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    /// <summary>
+    /// Opens the configured MaxMind databases, or DB-IP's when none are configured, and reopens a file that was
+    /// replaced by a newer download.
+    /// </summary>
     private void LoadDatabases(IntegrationSettings integrationSettings)
     {
-        if (integrationSettings.GeoIpCityDatabasePath != loadedCityPath)
+        var cityPath = string.IsNullOrWhiteSpace(integrationSettings.GeoIpCityDatabasePath) ? DbIpDatabases.CityPath : integrationSettings.GeoIpCityDatabasePath;
+        var asnPath = string.IsNullOrWhiteSpace(integrationSettings.GeoIpAsnDatabasePath) ? DbIpDatabases.AsnPath : integrationSettings.GeoIpAsnDatabasePath;
+
+        var cityWrite = File.Exists(cityPath) ? File.GetLastWriteTimeUtc(cityPath) : default;
+        if (cityPath != loadedCityPath || cityWrite != loadedCityWrite)
         {
             cityReader?.Dispose();
-            cityReader = OpenDatabase(integrationSettings.GeoIpCityDatabasePath);
-            loadedCityPath = integrationSettings.GeoIpCityDatabasePath;
+            cityReader = OpenDatabase(cityPath);
+            loadedCityPath = cityPath;
+            loadedCityWrite = cityWrite;
+            cityLookupSource = cityPath == DbIpDatabases.CityPath ? "DB-IP" : "MaxMind";
         }
 
-        if (integrationSettings.GeoIpAsnDatabasePath != loadedAsnPath)
+        var asnWrite = File.Exists(asnPath) ? File.GetLastWriteTimeUtc(asnPath) : default;
+        if (asnPath != loadedAsnPath || asnWrite != loadedAsnWrite)
         {
             asnReader?.Dispose();
-            asnReader = OpenDatabase(integrationSettings.GeoIpAsnDatabasePath);
-            loadedAsnPath = integrationSettings.GeoIpAsnDatabasePath;
+            asnReader = OpenDatabase(asnPath);
+            loadedAsnPath = asnPath;
+            loadedAsnWrite = asnWrite;
         }
     }
 
@@ -81,7 +96,7 @@ public class GeoIpResolver : IDisposable
         if (cityReader == null && asnReader == null)
             return null;
 
-        var profile = new IpAddressProfile { IpAddress = ipAddress, LookupSource = "MaxMind", LookedUpAt = DateTime.UtcNow };
+        var profile = new IpAddressProfile { IpAddress = ipAddress, LookupSource = cityLookupSource, LookedUpAt = DateTime.UtcNow };
         var found = false;
 
         if (cityReader != null && cityReader.TryCity(ipAddress, out var cityResponse) && cityResponse != null)

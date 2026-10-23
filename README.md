@@ -66,8 +66,23 @@ sha256sum -c --ignore-missing SHA256SUMS
 chmod +x scoutwall-linux-x64 && sudo ./scoutwall-linux-x64 install
 ```
 
-To **upgrade**, run `install` again with a newer executable; your data and settings are kept.
 To **remove** ScoutWall: `scoutwall uninstall` (add `--delete-data` to delete the database too).
+
+### Updating
+
+ScoutWall checks GitHub once a day and shows a notice in the console when a new version is out. To update, run:
+
+```sh
+scoutwall update          # Windows: in an administrator prompt.  Linux: sudo scoutwall update
+```
+
+It downloads the newest release, checks it against the release's checksums and upgrades in place; your data and
+settings are kept. `scoutwall update --check` only reports whether an update is available. While the repository is
+private, `update` uses your GitHub CLI sign-in (`gh auth login`) or a `GITHUB_TOKEN`.
+
+**Upgrading from 0.1.0**, which doesn't have `update` yet: install the newer executable over it once, the same way
+you installed it (for example `gh release download v0.1.1 --repo akatawazi/ScoutWall --pattern "scoutwall-win-x64.exe"`,
+then `.\scoutwall-win-x64.exe install` as administrator). From then on `scoutwall update` does it for you.
 
 > The executables aren't code-signed yet, so Windows SmartScreen may warn the first time you run one.
 
@@ -114,7 +129,10 @@ and loopback capture) and Windows' built-in packet capture otherwise. On Linux i
   port; anything that could come from a forged address is reported with a one-click block instead.
 - **Your data stays home.** The database lives in `C:\ProgramData\ScoutWall` (Windows) or `/var/lib/scoutwall`
   (Linux), readable only by ScoutWall's services and administrators, and old records are deleted on a schedule you
-  set. Nothing is sent anywhere unless you set up the assistant, notifications or an online location service.
+  set. Locations come from DB-IP's free databases, which ScoutWall downloads once a month and searches on your
+  computer, so the addresses you contact are never sent to a location service. Apart from that monthly download and
+  a daily check for a newer ScoutWall on GitHub (which you can turn off), nothing is sent anywhere unless you set up
+  the assistant, notifications or an online location service.
 - **Least privilege.** The web console runs under its own low-privilege account and listens on localhost only. On
   Linux nothing runs as root; the sensor gets only the network capabilities it needs.
 
@@ -134,6 +152,7 @@ Security log; turning it off, uninstalling or `scoutwall rescue` puts both back.
 
 ```
 scoutwall install      install or upgrade (administrator / root); --port 5215, --no-start
+scoutwall update       download and install the newest release; --check only reports
 scoutwall uninstall    remove; --delete-data also deletes the database
 scoutwall rescue       remove every ScoutWall firewall rule and undo audit changes (administrator)
 scoutwall version      show the version

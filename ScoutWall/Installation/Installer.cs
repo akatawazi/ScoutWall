@@ -11,7 +11,7 @@ public static class Installer
 {
     public const int DefaultPort = 5215;
 
-    public static string Version => typeof(Installer).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "dev";
+    public static string Version => ScoutWall.Data.ScoutWallVersion.Current;
 
     public static async Task<int> Install(string[] args)
     {

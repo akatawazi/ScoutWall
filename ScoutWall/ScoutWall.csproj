@@ -12,7 +12,7 @@
     <!-- Lets the Linux build machine restore the Windows target too. -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Product>ScoutWall</Product>
     <Company>Blue Shift Technologies</Company>
     <Copyright>Copyright (c) 2026 Blue Shift Technologies. MIT License.</Copyright>

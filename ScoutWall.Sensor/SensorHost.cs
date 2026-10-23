@@ -22,6 +22,9 @@ public static class SensorHost
             Configuration = new ConfigurationManager { ["hostBuilder:reloadConfigOnChange"] = "false" }
         });
         builder.Services.AddWindowsService(options => options.ServiceName = ServiceName);
+
+        // One failing part (logged as an error) must not stop capture, detection and everything else with it.
+        builder.Services.Configure<HostOptions>(options => options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore);
         builder.Services.AddSystemd();
 
         // Log to the event source registered for the service. The default source (the assembly name) is not
@@ -44,6 +47,7 @@ public static class SensorHost
         builder.Services.AddHostedService<DecryptionWorker>();
         builder.Services.AddHostedService<MaintenanceWorker>();
         builder.Services.AddHostedService<DecoyPortWorker>();
+        builder.Services.AddHostedService<UpdateCheckWorker>();
 
         // Per-program traffic, firewall responses and the System, I/O and presence features use Windows-only
         // interfaces (ETW, Windows Firewall, event logs, the NTFS change journal).
