@@ -1,0 +1,37 @@
+# Build output
+bin/
+obj/
+artifacts/
+publish/
+TestResults/
+
+# IDE and user files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.swp
+
+# ScoutWall data: databases, keys, captures and logs must never be committed
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.pcap
+*.pcapng
+*.etl
+*.log
+keys/
+secret.key
+setup-code.txt
+*.mmdb
+
+# Secrets and certificates
+*.pfx
+*.p12
+*.pem
+*.key
+.env
+*.env
+appsettings.Local.json

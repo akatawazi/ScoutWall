@@ -1,0 +1,13 @@
+@model int
+@{
+    var steps = new[] { "Your account", "What to watch", "How to protect you", "Your assistant", "Done" };
+}
+<ol class="sw-setup-steps list-unstyled d-flex flex-wrap gap-2 mb-4 small">
+    @for (var index = 0; index < steps.Length; index++)
+    {
+        var state = index < Model ? "done" : index == Model ? "current" : "todo";
+        <li class="sw-setup-step sw-setup-step-@state">
+            <span class="sw-setup-number">@(index < Model ? "✓" : (index + 1).ToString())</span> @steps[index]
+        </li>
+    }
+</ol>

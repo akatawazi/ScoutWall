@@ -1,0 +1,69 @@
+@model ProgramReport
+@{
+    ViewData["Title"] = Model.ProcessImage.Name;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+        <li class="breadcrumb-item"><a asp-action="Index">Data Flow</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.ProcessImage.Name</li>
+    </ol>
+</nav>
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h3 m-0">@Model.ProcessImage.Name</h1>
+        <div class="sw-mono small text-body-secondary text-break">@Model.ProcessImage.ImagePath</div>
+        <div class="small text-body-secondary">First seen @Display.Time(Model.ProcessImage.FirstSeenAt) &middot; last seen @Display.Time(Model.ProcessImage.LastSeenAt)</div>
+    </div>
+    <partial name="_RangePicker" model="Model.Range" />
+</div>
+
+@{
+    var totals = Model.Totals;
+}
+<div class="row g-3 mb-2">
+    <div class="col-6 col-lg-3"><div class="card sw-stat h-100"><div class="sw-stat-label">Uploaded while you were here</div><div class="sw-stat-value">@Display.Bytes(totals.HereBytesSent)</div></div></div>
+    <div class="col-6 col-lg-3"><div class="card sw-stat h-100"><div class="sw-stat-label">Uploaded while away</div><div class="sw-stat-value">@Display.Bytes(totals.AwayBytesSent)</div><div class="sw-stat-detail">@Display.Percent(totals.AwayShare) of its uploads</div></div></div>
+    <div class="col-6 col-lg-3"><div class="card sw-stat h-100"><div class="sw-stat-label">Downloaded while you were here</div><div class="sw-stat-value">@Display.Bytes(totals.HereBytesReceived)</div></div></div>
+    <div class="col-6 col-lg-3"><div class="card sw-stat h-100"><div class="sw-stat-label">Downloaded while away</div><div class="sw-stat-value">@Display.Bytes(totals.AwayBytesReceived)</div></div></div>
+</div>
+<p class="small text-body-secondary mb-4">
+    @Display.Bytes(totals.BytesSent) uploaded and @Display.Bytes(totals.BytesReceived) downloaded in total.
+    @if (totals.UnknownShare > 0)
+    {
+        <span>For @Display.Percent(totals.UnknownShare) of it ScoutWall couldn't tell whether anyone was at the computer.</span>
+    }
+</p>
+
+<partial name="_PresenceCharts" model="Model.Timeline" />
+
+<div class="card mb-4">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span>Where it sends data</span>
+        <div class="d-flex gap-2">
+            <form method="post" asp-controller="Responses" asp-action="Create" data-confirm="Block all outbound traffic from this program for one day?">
+                <input type="hidden" name="actionType" value="@ResponseActionType.BlockProgram" />
+                <input type="hidden" name="target" value="@Model.ProcessImage.ImagePath" />
+                <input type="hidden" name="durationMinutes" value="1440" />
+                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                <button type="submit" class="btn btn-sm btn-outline-danger">Block outbound (1 day)</button>
+            </form>
+            <form method="post" asp-controller="Responses" asp-action="Create">
+                <input type="hidden" name="actionType" value="@ResponseActionType.ThrottleProgram" />
+                <input type="hidden" name="target" value="@Model.ProcessImage.ImagePath" />
+                <input type="hidden" name="durationMinutes" value="1440" />
+                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                <button type="submit" class="btn btn-sm btn-outline-warning">Throttle uploads (1 day)</button>
+            </form>
+        </div>
+    </div>
+    <partial name="_DestinationTable" model="Model.Destinations" view-data='@(new ViewDataDictionary(ViewData) { ["ForProgram"] = true })' />
+</div>
+
+@if (Model.ResponseActions.Count > 0)
+{
+    <div class="card">
+        <div class="card-header">Response actions for this program</div>
+        <partial name="_ResponseTable" model="Model.ResponseActions" />
+    </div>
+}

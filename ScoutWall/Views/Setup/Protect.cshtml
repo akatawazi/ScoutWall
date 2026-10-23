@@ -1,0 +1,71 @@
+@model SettingsOverview
+@{
+    ViewData["Title"] = "How to protect you";
+    var protectionChoice = (ProtectionChoice)ViewData["ProtectionChoice"]!;
+    var choices = new (ProtectionChoice Choice, string Title, string Description)[]
+    {
+        (ProtectionChoice.JustTellMe, "Just tell me", "ScoutWall watches and lets you know. It never blocks anything on its own. A good place to start."),
+        (ProtectionChoice.BlockAutomatically, "Block threats automatically", "When something is clearly dangerous, ScoutWall blocks it for a while and tells you."),
+        (ProtectionChoice.BlockWhileAway, "Block only while I'm away", "While you use the computer, ScoutWall only watches. When nobody is at the keyboard, programs that start sending your data out get blocked until you're back."),
+        (ProtectionChoice.SlowItDown, "Slow things down instead of blocking", "Suspicious uploads are slowed to a trickle instead of cut off. Gentler, but less protective.")
+    };
+    var enforcement = Model.Enforcement;
+}
+<div class="sw-setup mx-auto">
+    <partial name="_SetupProgress" model="2" />
+    <h1 class="h3">What should ScoutWall do when it finds something bad?</h1>
+
+    <form method="post" asp-action="Protect" asp-route-fromSettings="@(Context.Request.Query["fromSettings"].ToString() is { Length: > 0 } fromSettings ? fromSettings : null)">
+        <div class="d-grid gap-2 mb-4">
+            @foreach (var (choice, title, description) in choices)
+            {
+                <label class="card sw-choice" for="protect-@choice">
+                    <div class="card-body d-flex gap-3">
+                        <input class="form-check-input mt-1" type="radio" name="protectionChoice" id="protect-@choice" value="@choice" checked="@(protectionChoice == choice)" />
+                        <div><div class="fw-semibold">@title</div><div class="small text-body-secondary">@description</div></div>
+                    </div>
+                </label>
+            }
+        </div>
+
+        <h2 class="h5">Where should blocks happen?</h2>
+        <div class="d-grid gap-2 mb-3">
+            <label class="card sw-choice" for="enforce-windows">
+                <div class="card-body d-flex gap-3">
+                    <input class="form-check-input mt-1" type="radio" name="enforcementProvider" id="enforce-windows" value="@EnforcementProvider.WindowsFirewall"
+                           checked="@(enforcement.Provider != EnforcementProvider.Webhook)" />
+                    <div><div class="fw-semibold">On this computer</div><div class="small text-body-secondary">Uses the Windows Defender Firewall that's already built into Windows.</div></div>
+                </div>
+            </label>
+            <label class="card sw-choice" for="enforce-webhook">
+                <div class="card-body d-flex gap-3">
+                    <input class="form-check-input mt-1" type="radio" name="enforcementProvider" id="enforce-webhook" value="@EnforcementProvider.Webhook"
+                           checked="@(enforcement.Provider == EnforcementProvider.Webhook)" />
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">On my router or firewall</div>
+                        <div class="small text-body-secondary mb-2">
+                            For routers and firewalls that can receive a web request (webhook). ScoutWall signs each request so the device can trust it.
+                            Home routers such as Linksys don't offer a way for other software to add blocks, so they can't be controlled directly; blocking on this computer works with any router.
+                        </div>
+                        <input class="form-control form-control-sm mb-2" name="webhookUrl" value="@enforcement.WebhookUrl" placeholder="https://firewall.local/scoutwall" />
+                        <input class="form-control form-control-sm" type="password" name="webhookSecret" autocomplete="off"
+                               placeholder="@(enforcement.HasWebhookSecret ? "Shared secret saved; leave blank to keep it" : "Shared secret")" />
+                    </div>
+                </div>
+            </label>
+        </div>
+
+        <div class="form-check form-switch mb-4">
+            <input class="form-check-input" type="checkbox" role="switch" id="practice-mode" name="practiceMode" value="true" checked="@Model.Response.DryRun" />
+            <input type="hidden" name="practiceMode" value="false" />
+            <label class="form-check-label" for="practice-mode">
+                <strong>Practice mode</strong>: show me what would have been blocked, but don't block anything yet. Recommended for the first few days.
+            </label>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a class="btn btn-link" asp-action="Watch">Back</a>
+            <button type="submit" class="btn btn-primary btn-lg">Continue</button>
+        </div>
+    </form>
+</div>

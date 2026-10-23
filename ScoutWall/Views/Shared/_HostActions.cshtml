@@ -1,0 +1,80 @@
+@model HostActionPanel
+@foreach (var target in Model.Targets)
+{
+    var kindName = target.Kind switch { HostTargetKind.ScheduledTask => "scheduled task", HostTargetKind.Program => "program", _ => "service" };
+    <div class="sw-host-target">
+        <div class="sw-host-target-name">
+            <span class="small text-body-secondary">@(target.Kind switch { HostTargetKind.ScheduledTask => "Task", HostTargetKind.Program => "Program", _ => "Service" })</span>
+            <span class="sw-mono small sw-truncate" title="@target.Name">@target.ShortName</span>
+            @if (target.StateText.Length > 0)
+            {
+                <span class="small @(target.HasFailed ? "text-danger" : "text-body-secondary")">&middot; @target.StateText</span>
+            }
+        </div>
+        <div class="d-flex flex-wrap gap-1">
+            @if (target.Refusal != null)
+            {
+                <span class="small text-body-secondary" title="@target.Refusal">Can't change: @target.Refusal</span>
+            }
+            else if (target.IsInForce && target.LatestAction != null)
+            {
+                <form method="post" asp-controller="Responses" asp-action="Revoke" asp-route-id="@target.LatestAction.Id"
+                      data-confirm="Put the @kindName @target.ShortName back the way it was?">
+                    <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                    <button type="submit" class="btn btn-sm sw-block-button">Undo</button>
+                </form>
+            }
+            else if (target.Kind == HostTargetKind.ScheduledTask)
+            {
+                <form method="post" asp-controller="Responses" asp-action="Create"
+                      data-confirm="Disable the scheduled task @target.ShortName? It stays on the computer but won't run. You can undo this.">
+                    <input type="hidden" name="actionType" value="@ResponseActionType.DisableScheduledTask" />
+                    <input type="hidden" name="target" value="@target.Name" />
+                    <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                    <button type="submit" class="btn btn-sm sw-block-button">Disable</button>
+                </form>
+                @if (!Model.Compact && target.RemoveRefusal == null)
+                {
+                    <form method="post" asp-controller="Responses" asp-action="Create"
+                          data-confirm="Remove the scheduled task @target.ShortName from this computer? ScoutWall keeps a copy so you can undo this, and removes it again if it comes back under the same name.">
+                        <input type="hidden" name="actionType" value="@ResponseActionType.DeleteScheduledTask" />
+                        <input type="hidden" name="target" value="@target.Name" />
+                        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                        <button type="submit" class="btn btn-sm sw-block-button sw-danger">Remove</button>
+                    </form>
+                }
+            }
+            else if (target.Kind == HostTargetKind.Program)
+            {
+                <form method="post" asp-controller="Responses" asp-action="Create"
+                      data-confirm="End @target.ShortName now? Unsaved work in it is lost. It can start again unless you also block it.">
+                    <input type="hidden" name="actionType" value="@ResponseActionType.KillProgram" />
+                    <input type="hidden" name="target" value="@target.Name" />
+                    <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                    <button type="submit" class="btn btn-sm sw-block-button">End</button>
+                </form>
+                @if (target.RemoveRefusal == null)
+                {
+                    <form method="post" asp-controller="Responses" asp-action="Create"
+                          data-confirm="Block @target.ShortName from running at all? It is ended now and can't start again until you unblock it under System.">
+                        <input type="hidden" name="actionType" value="@ResponseActionType.BlockExecution" />
+                        <input type="hidden" name="target" value="@target.Name" />
+                        <input type="hidden" name="durationMinutes" value="0" />
+                        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                        <button type="submit" class="btn btn-sm sw-block-button sw-danger">Block from running</button>
+                    </form>
+                }
+            }
+            else
+            {
+                <form method="post" asp-controller="Responses" asp-action="Create"
+                      data-confirm="Stop the service @target.Name and stop it from starting again? Anything that depends on it stops too. You can undo this.">
+                    <input type="hidden" name="actionType" value="@ResponseActionType.StopService" />
+                    <input type="hidden" name="target" value="@target.Name" />
+                    <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                    <button type="submit" class="btn btn-sm sw-block-button sw-danger">Stop and disable</button>
+                </form>
+            }
+        </div>
+    </div>
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "Name": "Web + Sensor (made-up traffic)",
+    "Projects": [
+      {
+        "Path": "ScoutWall\\ScoutWall.csproj",
+        "Action": "Start",
+        "DebugTarget": "Web console"
+      },
+      {
+        "Path": "ScoutWall\\ScoutWall.csproj",
+        "Action": "Start",
+        "DebugTarget": "Sensor (made-up traffic)"
+      }
+    ]
+  },
+  {
+    "Name": "Web + Sensor (live, run Visual Studio as administrator)",
+    "Projects": [
+      {
+        "Path": "ScoutWall\\ScoutWall.csproj",
+        "Action": "Start",
+        "DebugTarget": "Web console"
+      },
+      {
+        "Path": "ScoutWall\\ScoutWall.csproj",
+        "Action": "Start",
+        "DebugTarget": "Sensor (live, run Visual Studio as administrator)"
+      }
+    ]
+  }
+]

@@ -1,0 +1,149 @@
+@model List<ProcessTrafficSummary>
+@{
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    // The compact table (Dashboard, address details) shows totals only; Data Flow shows the full here/away split.
+    var compact = ViewData["Compact"] is true;
+}
+@if (Model.Count == 0)
+{
+    <p class="text-body-secondary small m-0 p-3">
+        No per-program data yet. Per-program tracking needs the sensor to run as administrator (or in synthetic mode).
+    </p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" data-sortable="programs">
+            <thead>
+                @if (compact)
+                {
+                    <tr>
+                        <th data-sort="text">Program</th>
+                        <th class="text-end" data-sort="number">Uploaded</th>
+                        <th class="text-end" data-sort="number">Downloaded</th>
+                        <th style="width: 7rem" data-sort="number" title="Part of the upload that happened while nobody was at the computer">Uploaded while away</th>
+                    </tr>
+                }
+                else
+                {
+                    <tr>
+                        <th rowspan="2" data-sort="text" data-sort-column="0">Program</th>
+                        <th colspan="2" class="sw-group-head">Uploaded</th>
+                        <th colspan="2" class="sw-group-head">Downloaded</th>
+                        <th rowspan="2" style="width: 7rem" data-sort="number" data-sort-column="5" title="Part of the upload that happened while nobody was at the computer">Away share</th>
+                        <th rowspan="2" class="text-end" data-sort="number" data-sort-column="6">Destinations</th>
+                    </tr>
+                    <tr>
+                        <th class="text-end" data-sort="number" data-sort-column="1">While here</th>
+                        <th class="text-end" data-sort="number" data-sort-column="2">While away</th>
+                        <th class="text-end" data-sort="number" data-sort-column="3">While here</th>
+                        <th class="text-end" data-sort="number" data-sort-column="4">While away</th>
+                    </tr>
+                }
+            </thead>
+            <tbody>
+                @foreach (var program in Model)
+                {
+                    <tr>
+                        <td data-sort-value="@program.Name">
+                            <div class="d-flex align-items-start gap-2 sw-program-cell">
+                                <div class="sw-program-name">
+                                    <a asp-controller="Programs" asp-action="Details" asp-route-id="@program.ProcessImageId">@program.Name</a>
+                                    @if (program.ProcessImage?.IsNew == true)
+                                    {
+                                        <span class="badge bg-warning text-dark ms-1" title="First seen in the last 24 hours">New</span>
+                                    }
+                                    <div class="small text-body-secondary sw-truncate sw-mono" title="@program.ProcessImage?.ImagePath">@program.ProcessImage?.ImagePath</div>
+                                </div>
+                                <div class="ms-auto d-flex flex-wrap gap-1 sw-program-actions">
+                                    @if (program.IsAllowlisted && !program.CanRemoveFromAllowlist)
+                                    {
+                                        <span class="sw-block-button sw-allowed sw-static" title="Part of Windows or ScoutWall, so it is always allowed.">
+                                            <svg aria-hidden="true" viewBox="0 0 16 16" width="14" height="14"><path d="M3 8.5l3.2 3.2L13 4.8" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                                            Always allowed
+                                        </span>
+                                    }
+                                    else if (program.IsAllowlisted)
+                                    {
+                                        <form method="post" asp-controller="Programs" asp-action="Disallow" asp-route-id="@program.ProcessImageId"
+                                              data-confirm="Take @program.Name off the allowlist? ScoutWall could then block it if it misbehaves.">
+                                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                            <button type="submit" class="btn btn-sm sw-block-button sw-allowed" title="Always allowed. Click to remove it from the allowlist.">
+                                                <svg aria-hidden="true" viewBox="0 0 16 16" width="14" height="14"><path d="M3 8.5l3.2 3.2L13 4.8" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                                                Always allowed
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        @if (program.ActiveBlockId is long blockId)
+                                        {
+                                            <form method="post" asp-controller="Responses" asp-action="Revoke" asp-route-id="@blockId"
+                                                  data-confirm="Let @program.Name use the internet again?">
+                                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                                <button type="submit" class="btn btn-sm sw-block-button sw-blocked" title="Blocked. Click to unblock.">
+                                                    <svg aria-hidden="true" viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.75" /><path d="M3.6 3.6l8.8 8.8" stroke="currentColor" stroke-width="1.75" /></svg>
+                                                    Blocked
+                                                </button>
+                                            </form>
+                                        }
+                                        else if (program.ProcessImage != null && program.BlockRefusal == null)
+                                        {
+                                            <form method="post" asp-controller="Responses" asp-action="Create"
+                                                  data-confirm="Block @program.Name from using the internet until you unblock it? You can undo this here or on the Blocks page.">
+                                                <input type="hidden" name="actionType" value="@ResponseActionType.BlockProgram" />
+                                                <input type="hidden" name="target" value="@program.ProcessImage.ImagePath" />
+                                                <input type="hidden" name="durationMinutes" value="0" />
+                                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                                <button type="submit" class="btn btn-sm sw-block-button" title="Block @program.Name from the internet">
+                                                    <svg aria-hidden="true" viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.75" /><path d="M3.6 3.6l8.8 8.8" stroke="currentColor" stroke-width="1.75" /></svg>
+                                                    Block
+                                                </button>
+                                            </form>
+                                        }
+                                        else if (program.BlockRefusal != null)
+                                        {
+                                            <span class="small text-body-secondary sw-no-block" title="@program.BlockRefusal">Can't block</span>
+                                        }
+
+                                        @if (program.ProcessImage != null && (program.BlockRefusal == null || program.ActiveBlockId != null))
+                                        {
+                                            <form method="post" asp-controller="Programs" asp-action="Allow" asp-route-id="@program.ProcessImageId"
+                                                  data-confirm="Always allow @program.Name? ScoutWall will never block or slow it down, and any block on it is lifted. You can undo this here or under Settings.">
+                                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                                <button type="submit" class="btn btn-sm sw-block-button sw-allow" title="Always allow @program.Name (add it to the never-block allowlist)">
+                                                    <svg aria-hidden="true" viewBox="0 0 16 16" width="14" height="14"><path d="M3 8.5l3.2 3.2L13 4.8" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                                                    Allow
+                                                </button>
+                                            </form>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                        @if (compact)
+                        {
+                            <td class="text-end" data-sort-value="@program.BytesSent">@Display.Bytes(program.BytesSent)</td>
+                            <td class="text-end" data-sort-value="@program.BytesReceived">@Display.Bytes(program.BytesReceived)</td>
+                        }
+                        else
+                        {
+                            <partial name="_PresenceBytes" model="(program.HereBytesSent, program.AwayBytesSent, program.UnknownBytesSent)" />
+                            <partial name="_PresenceBytes" model="(program.HereBytesReceived, program.AwayBytesReceived, program.UnknownBytesReceived)" />
+                        }
+                        <td data-sort-value="@program.AwayShare.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                            <div class="sw-bar-track" title="@Display.Percent(program.AwayShare) of the upload happened while nobody was at the computer">
+                                <div class="sw-bar-fill" style="width: @((int)(program.AwayShare * 100))%"></div>
+                            </div>
+                            <div class="small text-body-secondary">@Display.Percent(program.AwayShare)</div>
+                        </td>
+                        @if (!compact)
+                        {
+                            <td class="text-end" data-sort-value="@program.RemoteAddressCount">@program.RemoteAddressCount</td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

@@ -1,0 +1,86 @@
+@model SettingsOverview
+<form method="post" asp-action="SaveVerdict">
+    <input type="hidden" name="revision" value="@(Model.RevisionOf<VerdictSettings>())" />
+    <div class="card mb-4">
+        <div class="card-header">Flow analysis</div>
+        <div class="card-body row g-3">
+            <p class="small text-body-secondary mb-0">
+                Every few seconds the sensor builds a feature record for each recent flow to the internet (program, destination, network owner,
+                server name, volume, idle state, novelty) and asks each enabled verdict provider whether it looks ok, suspicious or problematic.
+            </p>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Verdict.EvaluationIntervalSeconds">Evaluate every (seconds)</label>
+                <input class="form-control" asp-for="Verdict.EvaluationIntervalSeconds" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Verdict.MaximumFlowsPerPass">Maximum flows per pass</label>
+                <input class="form-control" asp-for="Verdict.MaximumFlowsPerPass" />
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">ScoreCard (built in, deterministic)</div>
+        <div class="card-body row g-3">
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" asp-for="Verdict.ScoreCardEnabled" />
+                    <label class="form-check-label" asp-for="Verdict.ScoreCardEnabled">Enable the ScoreCard. It adds points for stated reasons and is the authoritative verdict.</label>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Verdict.ScoreCardSuspiciousScore">Suspicious at (points)</label>
+                <input class="form-control" asp-for="Verdict.ScoreCardSuspiciousScore" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Verdict.ScoreCardProblematicScore">Problematic at (points)</label>
+                <input class="form-control" asp-for="Verdict.ScoreCardProblematicScore" />
+            </div>
+            <div class="col-lg-6">
+                <label class="form-label" asp-for="Verdict.HighRiskCountriesText">High-risk destination countries (ISO codes, comma separated)</label>
+                <input class="form-control sw-mono" asp-for="Verdict.HighRiskCountriesText" placeholder="Empty by default" />
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">zev decision engine (external, experimental)</div>
+        <div class="card-body row g-3">
+            <div class="col-12 small text-body-secondary">
+                <a href="https://github.com/bhubbard/zev-rs" rel="noreferrer">zev</a> is a general-purpose text decision engine. ScoutWall renders each flow as a short,
+                sanitized description and asks zev to choose normal, suspicious or malicious. zev was not built for network data, so its verdicts
+                are stored for comparison and can never trigger blocking. Start zev on this computer with <code>zev serve</code>.
+            </div>
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" asp-for="Verdict.ZevEnabled" />
+                    <label class="form-check-label" asp-for="Verdict.ZevEnabled">Ask zev about flows</label>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <label class="form-label" asp-for="Verdict.ZevEndpointUrl">Endpoint (must be on this computer)</label>
+                <input class="form-control sw-mono" asp-for="Verdict.ZevEndpointUrl" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Verdict.ZevMode">Mode</label>
+                <select class="form-select" asp-for="Verdict.ZevMode">
+                    <option value="@ExternalVerdictMode.Shadow">Shadow: store only</option>
+                    <option value="@ExternalVerdictMode.Annotate">Annotate: low-severity alerts</option>
+                </select>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Verdict.ZevMinimumConfidence">Minimum confidence</label>
+                <input class="form-control" asp-for="Verdict.ZevMinimumConfidence" step="0.01" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Verdict.ZevMaximumRequestsPerMinute">Maximum requests per minute</label>
+                <input class="form-control" asp-for="Verdict.ZevMaximumRequestsPerMinute" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Verdict.ZevTimeoutMilliseconds">Timeout (ms)</label>
+                <input class="form-control" asp-for="Verdict.ZevTimeoutMilliseconds" />
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save analysis settings</button>
+</form>

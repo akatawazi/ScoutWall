@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Web console": {
+      "commandName": "Project",
+      "commandLineArgs": "web",
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5220",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development"
+      },
+      "dotnetRunMessages": true
+    },
+    "Sensor (made-up traffic)": {
+      "commandName": "Project",
+      "commandLineArgs": "sensor --Sensor:CaptureMode=Synthetic",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "Sensor (live, run Visual Studio as administrator)": {
+      "commandName": "Project",
+      "commandLineArgs": "sensor",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

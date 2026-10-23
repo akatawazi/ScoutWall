@@ -1,0 +1,72 @@
+# Builds the single-file executables when a version tag (v1.2.3) is pushed and publishes them as a GitHub release,
+# with SHA-256 checksums and install scripts pinned to that release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            framework: net10.0-windows
+            output: scoutwall.exe
+            asset: scoutwall-win-x64.exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            framework: net10.0
+            output: scoutwall
+            asset: scoutwall-linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish single file
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          dotnet publish ScoutWall/ScoutWall.csproj -c Release -f ${{ matrix.framework }} -r ${{ matrix.rid }} \
+            -p:PublishSingleFile=true -p:Version="$version" -o publish
+          mv "publish/${{ matrix.output }}" "${{ matrix.asset }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: Pin install scripts to this release and write checksums
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          for script in install.ps1 install.sh; do
+            sed -e "s|__VERSION__|$version|g" -e "s|__REPOSITORY__|${GITHUB_REPOSITORY}|g" "scripts/$script" > "assets/$script"
+          done
+          cd assets
+          sha256sum scoutwall-win-x64.exe scoutwall-linux-x64 > SHA256SUMS
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" assets/* --title "ScoutWall ${GITHUB_REF_NAME#v}" --generate-notes

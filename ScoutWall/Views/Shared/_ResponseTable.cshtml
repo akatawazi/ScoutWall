@@ -1,0 +1,54 @@
+@model List<ResponseAction>
+@if (Model.Count == 0)
+{
+    <p class="text-body-secondary small m-0 p-3">No response actions.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr><th>Action</th><th>Target</th><th>Status</th><th>Reason</th><th>Created</th><th>Expires</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var responseAction in Model)
+                {
+                    <tr>
+                        <td>
+                            @responseAction.ActionLabel
+                            <div class="small text-body-secondary">
+                                @(responseAction.BlockInbound ? "inbound " : "")@(responseAction.BlockOutbound ? "outbound" : "")
+                                @(responseAction.EndsWhenUserReturns ? "· until user returns" : "")
+                            </div>
+                        </td>
+                        <td class="sw-mono sw-truncate" title="@responseAction.Target">@responseAction.Target</td>
+                        <td>
+                            <span class="badge @responseAction.StatusBadgeClass">@responseAction.Status</span>
+                            @if (responseAction.LastError != null)
+                            {
+                                <div class="small text-danger sw-truncate" title="@responseAction.LastError">@responseAction.LastError</div>
+                            }
+                        </td>
+                        <td class="small sw-truncate" title="@responseAction.Reason">
+                            @responseAction.Reason
+                            @if (responseAction.AlertId.HasValue)
+                            {
+                                <a asp-controller="Alerts" asp-action="Details" asp-route-id="@responseAction.AlertId">alert</a>
+                            }
+                        </td>
+                        <td class="small">@Display.Time(responseAction.CreatedAt)<div class="text-body-secondary">@responseAction.CreatedBy</div></td>
+                        <td class="small">@(responseAction.ExpiresAt.HasValue ? Display.Time(responseAction.ExpiresAt) : new Microsoft.AspNetCore.Html.HtmlString("Never"))</td>
+                        <td class="text-end">
+                            @if (responseAction.IsDesired || responseAction.Status == ResponseActionStatus.Simulated)
+                            {
+                                <form method="post" asp-controller="Responses" asp-action="Revoke" asp-route-id="@responseAction.Id">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Revoke</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

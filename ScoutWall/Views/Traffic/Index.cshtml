@@ -1,0 +1,69 @@
+@model TrafficReport
+@{
+    ViewData["Title"] = "Traffic";
+}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <h1 class="h3 m-0">Traffic</h1>
+    <partial name="_RangePicker" model="Model.Range" />
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3"><div class="card sw-stat h-100"><div class="sw-stat-label">Incoming</div><div class="sw-stat-value">@Display.Bytes(Model.Totals.BytesIn)</div></div></div>
+    <div class="col-6 col-lg-3"><div class="card sw-stat h-100"><div class="sw-stat-label">Outgoing</div><div class="sw-stat-value">@Display.Bytes(Model.Totals.BytesOut)</div></div></div>
+    <div class="col-6 col-lg-3"><div class="card sw-stat h-100"><div class="sw-stat-label">New connections</div><div class="sw-stat-value">@Display.Number(Model.Totals.ConnectionCount)</div></div></div>
+    <div class="col-6 col-lg-3"><div class="card sw-stat h-100"><div class="sw-stat-label">Remote addresses</div><div class="sw-stat-value">@Display.Number(Model.Totals.UniqueRemoteAddresses)</div></div></div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Traffic over time</div>
+    <div class="card-body">
+        <div class="sw-chart"><canvas data-chart="traffic-timeline" aria-label="Incoming and outgoing bytes over time" role="img"></canvas></div>
+        <script type="application/json" id="traffic-timeline">@Display.ChartData(Charts.TrafficTimeline(Model.Timeline))</script>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Sources of incoming traffic</div>
+    <partial name="_AddressTable" model="Model.TopSources" />
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Destinations of outgoing traffic</div>
+    <partial name="_AddressTable" model="Model.TopDestinations" />
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-6">
+        <div class="card h-100">
+            <div class="card-header">Local machines</div>
+            <partial name="_AddressTable" model="Model.TopLocalAddresses" />
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="card h-100">
+            <div class="card-header">Services</div>
+            <partial name="_ServiceTable" model="Model.TopServices" />
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header">Countries</div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead><tr><th>Country</th><th class="text-end">In</th><th class="text-end">Out</th><th class="text-end">Connections</th><th class="text-end">Addresses</th></tr></thead>
+            <tbody>
+                @foreach (var countrySummary in Model.TopCountries)
+                {
+                    <tr>
+                        <td>@countrySummary.CountryName <span class="small text-body-secondary">@countrySummary.CountryCode</span></td>
+                        <td class="text-end">@Display.Bytes(countrySummary.BytesIn)</td>
+                        <td class="text-end">@Display.Bytes(countrySummary.BytesOut)</td>
+                        <td class="text-end">@Display.Number(countrySummary.ConnectionCount)</td>
+                        <td class="text-end">@countrySummary.RemoteAddressCount</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

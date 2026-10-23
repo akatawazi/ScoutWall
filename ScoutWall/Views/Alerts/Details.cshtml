@@ -1,0 +1,142 @@
+@model Alert
+@{
+    ViewData["Title"] = Model.Title;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+        <li class="breadcrumb-item"><a asp-action="Index">Alerts</a></li>
+        <li class="breadcrumb-item active" aria-current="page">#@Model.Id</li>
+    </ol>
+</nav>
+
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h4 mb-1">@Model.Title</h1>
+        <div class="d-flex gap-2 align-items-center">
+            <partial name="_Severity" model="Model.Severity" />
+            <span class="badge @Model.StatusBadgeClass">@Model.Status</span>
+            <span class="small text-body-secondary">@Model.RuleName</span>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        @if (Model.Status == AlertStatus.Open)
+        {
+            <form method="post" asp-action="Acknowledge" asp-route-id="@Model.Id">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Acknowledge</button>
+            </form>
+        }
+        @if (Model.Status != AlertStatus.Resolved)
+        {
+            <form method="post" asp-action="Resolve" asp-route-id="@Model.Id">
+                <button type="submit" class="btn btn-sm btn-outline-success">Resolve</button>
+            </form>
+        }
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-body">
+                @if (Model.AnalystNote != null)
+                {
+                    <div class="alert alert-secondary small">
+                        <strong>Analyst:</strong> @Model.AnalystNote
+                        @if (Model.IsHardRule)
+                        {
+                            <div class="mt-1 text-body-secondary">This is a hard-rule alert, so the analyst can explain it but not close it.</div>
+                        }
+                    </div>
+                }
+                <p>@Model.Description</p>
+                <dl class="row small mb-0">
+                    @if (Model.IsHostEvent)
+                    {
+                        <dt class="col-sm-4">Source</dt>
+                        <dd class="col-sm-8"><a asp-controller="System" asp-action="Index">This computer's Windows logs</a></dd>
+                        <dt class="col-sm-4">About</dt>
+                        <dd class="col-sm-8">@(Model.Subject ?? "-")</dd>
+                    }
+                    else
+                    {
+                        <dt class="col-sm-4">Source</dt>
+                        <dd class="col-sm-8"><a asp-controller="Addresses" asp-action="Details" asp-route-id="@Model.SourceIp" class="sw-mono">@Model.SourceIp</a></dd>
+                        <dt class="col-sm-4">Destination</dt>
+                        <dd class="col-sm-8 sw-mono">@(Model.DestinationIp ?? "-")@(Model.DestinationPort.HasValue ? ":" + Model.DestinationPort : "") @Model.Protocol</dd>
+                    }
+                    @if (Model.ProcessPath != null)
+                    {
+                        <dt class="col-sm-4">Program</dt>
+                        <dd class="col-sm-8 sw-mono text-break">@Model.ProcessPath</dd>
+                    }
+                    <dt class="col-sm-4">First seen</dt>
+                    <dd class="col-sm-8">@Display.Time(Model.CreatedAt)</dd>
+                    <dt class="col-sm-4">Last seen</dt>
+                    <dd class="col-sm-8">@Display.Time(Model.LastSeenAt)</dd>
+                    <dt class="col-sm-4">Occurrences</dt>
+                    <dd class="col-sm-8">@Display.Number(Model.OccurrenceCount)</dd>
+                    @if (Model.AcknowledgedBy != null)
+                    {
+                        <dt class="col-sm-4">Handled by</dt>
+                        <dd class="col-sm-8">@Model.AcknowledgedBy, @Display.Time(Model.AcknowledgedAt)</dd>
+                    }
+                </dl>
+                @if (!string.IsNullOrEmpty(Model.Details))
+                {
+                    <h2 class="h6 mt-3">Evidence</h2>
+                    <pre class="sw-details small mb-0">@Model.Details</pre>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header">Respond</div>
+            <div class="card-body">
+                <p class="small text-body-secondary">Manual actions are applied by the sensor even in dry-run mode. They can be revoked on the Responses page.</p>
+                @if (Model.HostActionTargets.Count > 0)
+                {
+                    <p class="small mb-2">Deal with what this alert is about:</p>
+                    <div class="mb-3">
+                        <partial name="_HostActions" model="new HostActionPanel(Model.HostActionTargets, false, returnUrl)" />
+                    </div>
+                }
+                @if (!Model.IsHostEvent)
+                {
+                <form method="post" asp-controller="Responses" asp-action="Create" class="mb-3">
+                    <input type="hidden" name="actionType" value="@ResponseActionType.BlockAddress" />
+                    <input type="hidden" name="target" value="@Model.SourceIp" />
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                    <div class="input-group input-group-sm">
+                        <select name="durationMinutes" class="form-select" aria-label="Duration">
+                            <option value="60">1 hour</option>
+                            <option value="1440">1 day</option>
+                            <option value="10080">7 days</option>
+                            <option value="0">Until revoked</option>
+                        </select>
+                        <button type="submit" class="btn btn-danger">Block @Model.SourceIp</button>
+                    </div>
+                </form>
+                }
+                @if (Model.ProcessPath != null)
+                {
+                    <form method="post" asp-controller="Responses" asp-action="Create" class="mb-3">
+                        <input type="hidden" name="actionType" value="@ResponseActionType.BlockProgram" />
+                        <input type="hidden" name="target" value="@Model.ProcessPath" />
+                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                        <input type="hidden" name="durationMinutes" value="1440" />
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Block this program's outbound traffic for a day</button>
+                    </form>
+                    <form method="post" asp-controller="Responses" asp-action="Create">
+                        <input type="hidden" name="actionType" value="@ResponseActionType.ThrottleProgram" />
+                        <input type="hidden" name="target" value="@Model.ProcessPath" />
+                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                        <input type="hidden" name="durationMinutes" value="1440" />
+                        <button type="submit" class="btn btn-sm btn-outline-warning">Throttle this program's uploads for a day</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+</div>

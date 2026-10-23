@@ -1,0 +1,23 @@
+@model SettingsOverview
+<form method="post" asp-action="SaveRetention">
+    <input type="hidden" name="revision" value="@(Model.RevisionOf<RetentionSettings>())" />
+    <div class="card mb-4">
+        <div class="card-header">Keep data for (days)</div>
+        <div class="card-body row g-3">
+            <div class="col-sm-6 col-lg-3"><label class="form-label" asp-for="Retention.MinuteTrafficDays">Per-minute traffic</label><input class="form-control" asp-for="Retention.MinuteTrafficDays" /></div>
+            <div class="col-sm-6 col-lg-3"><label class="form-label" asp-for="Retention.HourTrafficDays">Hourly traffic</label><input class="form-control" asp-for="Retention.HourTrafficDays" /></div>
+            <div class="col-sm-6 col-lg-3"><label class="form-label" asp-for="Retention.ProcessTrafficDays">Per-program traffic</label><input class="form-control" asp-for="Retention.ProcessTrafficDays" /></div>
+            <div class="col-sm-6 col-lg-3"><label class="form-label" asp-for="Retention.ResolvedAlertDays">Resolved alerts</label><input class="form-control" asp-for="Retention.ResolvedAlertDays" /></div>
+            <div class="col-sm-6 col-lg-3"><label class="form-label" asp-for="Retention.DnsRecordDays">DNS names</label><input class="form-control" asp-for="Retention.DnsRecordDays" /></div>
+            <div class="col-sm-6 col-lg-3"><label class="form-label" asp-for="Retention.TlsSessionDays">TLS connections</label><input class="form-control" asp-for="Retention.TlsSessionDays" /></div>
+            <div class="col-sm-6 col-lg-3"><label class="form-label" asp-for="Retention.DecryptedRequestDays">Decrypted requests</label><input class="form-control" asp-for="Retention.DecryptedRequestDays" /></div>
+            <div class="col-sm-6 col-lg-3"><label class="form-label" asp-for="Retention.FlowVerdictDays">Flow verdicts</label><input class="form-control" asp-for="Retention.FlowVerdictDays" /></div>
+            <div class="col-sm-6 col-lg-3"><label class="form-label" asp-for="Retention.SystemResourceDays">CPU and memory history</label><input class="form-control" asp-for="Retention.SystemResourceDays" /></div>
+            <div class="col-sm-6 col-lg-3"><label class="form-label" asp-for="Retention.SystemEventDays">System events</label><input class="form-control" asp-for="Retention.SystemEventDays" /></div>
+            <div class="col-sm-6 col-lg-3"><label class="form-label" asp-for="Retention.FileChangeDays">File changes</label><input class="form-control" asp-for="Retention.FileChangeDays" /></div>
+            <div class="col-sm-6 col-lg-3"><label class="form-label" asp-for="Retention.DiskActivityDays">Drive activity</label><input class="form-control" asp-for="Retention.DiskActivityDays" /></div>
+            <div class="col-sm-6 col-lg-3"><label class="form-label" asp-for="Retention.AuditDays">Audit log</label><input class="form-control" asp-for="Retention.AuditDays" /></div>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save retention settings</button>
+</form>

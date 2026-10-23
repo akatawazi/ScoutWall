@@ -1,0 +1,54 @@
+@model SetupAccountForm
+@{
+    ViewData["Title"] = "Welcome";
+}
+<div class="sw-setup mx-auto">
+    <partial name="_SetupProgress" model="0" />
+    <div class="card sw-hero mb-4">
+        <div class="card-body p-4 p-md-5">
+            <img src="~/img/scoutwall-logo.webp" alt="ScoutWall, with Scout the dog" class="sw-logo mb-4" width="1400" height="456" />
+            <div>
+                <h1 class="h2 mb-2">Welcome to ScoutWall</h1>
+                <p class="mb-0 text-body-secondary">
+                    Scout watches your computer's internet connections and tells you, in plain words, when something needs your attention.
+                    First, create the account you'll use to sign in.
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body p-4">
+            <form method="post" asp-action="Account">
+                <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+                <div class="mb-3">
+                    <label asp-for="Email" class="form-label">Your email</label>
+                    <input asp-for="Email" class="form-control" autocomplete="username" autofocus />
+                    <span asp-validation-for="Email" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Password" class="form-label">Choose a password</label>
+                    <input asp-for="Password" class="form-control" autocomplete="new-password" />
+                    <div class="form-text">At least @ScoutWall.Data.Models.User.MinimumPasswordLength characters.</div>
+                    <span asp-validation-for="Password" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="ConfirmPassword" class="form-label"></label>
+                    <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
+                    <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+                </div>
+                @if (!Model.IsLocal)
+                {
+                    <div class="mb-3">
+                        <label asp-for="SetupCode" class="form-label"></label>
+                        <input asp-for="SetupCode" class="form-control sw-mono" autocomplete="off" />
+                        <div class="form-text">
+                            You're setting up ScoutWall from another computer. For safety, enter the one-time code from
+                            <code>@(Model.CodeFilePath ?? "setup-code.txt in the ScoutWall data folder")</code> on the ScoutWall computer (an administrator can open it).
+                        </div>
+                    </div>
+                }
+                <button type="submit" class="btn btn-primary btn-lg w-100">Create my account</button>
+            </form>
+        </div>
+    </div>
+</div>

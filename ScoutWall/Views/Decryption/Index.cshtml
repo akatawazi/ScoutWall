@@ -1,0 +1,41 @@
+@model DecryptionReport
+@{
+    ViewData["Title"] = "TLS & decryption";
+}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h3 m-0">TLS &amp; decryption</h1>
+        <div class="text-body-secondary small">What encrypted connections reveal without decryption, and what can be recovered with session keys.</div>
+    </div>
+    <form method="get" class="d-flex gap-2">
+        <input class="form-control form-control-sm" name="search" value="@Model.Search" placeholder="Host, path or address" aria-label="Search" />
+        <button type="submit" class="btn btn-sm btn-primary">Search</button>
+    </form>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body small">
+        <p class="mb-2">
+            <strong>Decryption is @(Model.DecryptionEnabled ? "on" : "off").</strong>
+            Encrypted traffic can only be decrypted when the program that made the connection shares its session keys.
+            Chrome, Edge, Firefox and curl write them to the file named in the <code>SSLKEYLOGFILE</code> environment variable.
+            The sensor then decrypts finished capture files with Wireshark's <code>tshark</code> and stores request method, host and path
+            (never bodies, cookies, credentials or query strings).
+        </p>
+        <p class="mb-0 text-body-secondary">
+            Traffic from other devices, or from programs that do not export keys, cannot be decrypted by any passive monitor.
+            For those, the server name and protocol below are still visible, unless the site uses Encrypted Client Hello.
+            <a asp-controller="Settings" asp-action="Index" asp-route-tab="integrations">Configure decryption</a>
+        </p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Decrypted requests</div>
+    <partial name="_DecryptedTable" model="Model.DecryptedRequests" />
+</div>
+
+<div class="card">
+    <div class="card-header">TLS connections (metadata visible without decryption)</div>
+    <partial name="_TlsTable" model="Model.TlsSessions" />
+</div>

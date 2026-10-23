@@ -1,0 +1,12 @@
+@model LearningPeriod
+@if (Model.IsActive)
+{
+    <div class="alert alert-info d-flex flex-wrap gap-2 align-items-center" role="status">
+        <strong>Learning this computer.</strong>
+        <span>
+            ScoutWall started watching @Display.Time(Model.StartedAt) and is learning what normal looks like until @Display.Time(Model.EndsAt)
+            (about @((int)Math.Ceiling(Model.Remaining.TotalHours)) hours left). Until then, new programs and destinations are not treated as suspicious;
+            blocklisted destinations, scans and data leaving while you are away are still reported.
+        </span>
+    </div>
+}

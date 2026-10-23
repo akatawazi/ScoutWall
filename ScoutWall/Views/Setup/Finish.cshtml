@@ -1,0 +1,33 @@
+@model SettingsOverview
+@{
+    ViewData["Title"] = "All set";
+    var watched = Model.Capture.InterfaceNames.Count == 0
+        ? "Your internet connections"
+        : string.Join(", ", Model.Interfaces.Where(item => Model.Capture.InterfaceNames.Contains(item.Name)).Select(item => item.DisplayName));
+    var protection = Model.Response.Mode switch
+    {
+        ResponseMode.Block => "Block threats automatically",
+        ResponseMode.Throttle => "Slow suspicious uploads down",
+        ResponseMode.BlockWhenIdle => "Block programs that send data while you're away",
+        _ => "Just tell you"
+    };
+}
+<div class="sw-setup mx-auto">
+    <partial name="_SetupProgress" model="4" />
+    <h1 class="h3">You're all set</h1>
+    <div class="card mb-4">
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item"><span class="text-body-secondary">Watching:</span> @watched</li>
+            <li class="list-group-item"><span class="text-body-secondary">When something bad is found:</span> @protection@(Model.Response.DryRun && Model.Response.Mode != ResponseMode.WatchAndAlert ? " (practice mode: nothing is blocked yet)" : "")</li>
+            <li class="list-group-item"><span class="text-body-secondary">Blocks happen:</span> @Model.Enforcement.ProviderDisplayName</li>
+            <li class="list-group-item"><span class="text-body-secondary">Assistant:</span> @(Model.Analyst.IsReady ? Model.Analyst.ProviderDisplayName : "None for now")</li>
+        </ul>
+    </div>
+    <p class="text-body-secondary">
+        For the first day, ScoutWall learns what's normal for this computer, so it stays quiet about ordinary things. You can change any of this later by asking the assistant, or under Settings.
+    </p>
+    <form method="post" asp-action="Finish" class="d-flex justify-content-between">
+        <a class="btn btn-link" asp-action="Assistant">Back</a>
+        <button type="submit" class="btn btn-primary btn-lg">Start watching</button>
+    </form>
+</div>

@@ -1,0 +1,94 @@
+@model SettingsOverview
+@{
+    var modes = new[]
+    {
+        (ResponseMode.WatchAndAlert, "Watch and alert", "Record and alert only. Nothing is changed on this computer."),
+        (ResponseMode.Block, "Block", "Alerts at or above the minimum severity block the offending address (or program) in Windows Firewall for the set time."),
+        (ResponseMode.Throttle, "Throttle", "Limit the bandwidth of the offending address or program with a Windows QoS policy. Only affects data this computer sends."),
+        (ResponseMode.BlockWhenIdle, "Block when not in use", "Watch while someone uses the computer. When there has been no keyboard or mouse input for the idle time, block as below until they return.")
+    };
+}
+<form method="post" asp-action="SaveResponse">
+    <input type="hidden" name="revision" value="@(Model.RevisionOf<ResponseSettings>())" />
+    <div class="card mb-4">
+        <div class="card-header">Response mode</div>
+        <div class="card-body">
+            @foreach (var (mode, label, description) in modes)
+            {
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="Response.Mode" id="mode-@mode" value="@mode" checked="@(Model.Response.Mode == mode)" />
+                    <label class="form-check-label" for="mode-@mode"><strong>@label</strong><br /><span class="small text-body-secondary">@description</span></label>
+                </div>
+            }
+            <div class="form-check form-switch mt-3">
+                <input class="form-check-input" asp-for="Response.DryRun" />
+                <label class="form-check-label" asp-for="Response.DryRun"><strong>Dry run</strong>: record what would be done as "Simulated" without touching the firewall. Recommended until you trust the alerts.</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">When to act</div>
+        <div class="card-body row g-3">
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Response.MinimumSeverity">Minimum alert severity</label>
+                <select class="form-select" asp-for="Response.MinimumSeverity" asp-items="Html.GetEnumSelectList<AlertSeverity>()"></select>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Response.ActionDurationMinutes">Duration (minutes)</label>
+                <input class="form-control" asp-for="Response.ActionDurationMinutes" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Response.MaximumActiveActions">Maximum active actions</label>
+                <input class="form-control" asp-for="Response.MaximumActiveActions" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Response.ThrottleKilobitsPerSecond">Throttle rate (kbit/s)</label>
+                <input class="form-control" asp-for="Response.ThrottleKilobitsPerSecond" />
+            </div>
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" asp-for="Response.BlockOutbound" />
+                    <label class="form-check-label" asp-for="Response.BlockOutbound">Also block outbound traffic to offending addresses (can break unrelated sites that share CDN addresses)</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">When nobody is using the computer</div>
+        <div class="card-body row g-3">
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Response.IdleMinutes">Idle after (minutes without input)</label>
+                <input class="form-control" asp-for="Response.IdleMinutes" />
+            </div>
+            <div class="col-lg-9">
+                <label class="form-label">While idle, block</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="Response.IdleScope" id="idle-programs" value="@IdleBlockScope.OffendingPrograms" checked="@(Model.Response.IdleScope == IdleBlockScope.OffendingPrograms)" />
+                    <label class="form-check-label" for="idle-programs">Only programs that start sending data out (recommended)</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="Response.IdleScope" id="idle-internet" value="@IdleBlockScope.AllInternet" checked="@(Model.Response.IdleScope == IdleBlockScope.AllInternet)" />
+                    <label class="form-check-label" for="idle-internet">All internet traffic except allowlisted addresses (local network, DNS and gateway stay reachable; updates and backups will pause)</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Never block</div>
+        <div class="card-body row g-3">
+            <div class="col-lg-6">
+                <label class="form-label" asp-for="Response.AllowlistedAddressesText">Addresses and ranges (one per line)</label>
+                <textarea class="form-control sw-mono" asp-for="Response.AllowlistedAddressesText" rows="6"></textarea>
+                <div class="form-text">Private, local, gateway and DNS addresses are always protected.</div>
+            </div>
+            <div class="col-lg-6">
+                <label class="form-label" asp-for="Response.AllowlistedProgramsText">Programs (file name or full path, one per line)</label>
+                <textarea class="form-control sw-mono" asp-for="Response.AllowlistedProgramsText" rows="6"></textarea>
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save response settings</button>
+</form>

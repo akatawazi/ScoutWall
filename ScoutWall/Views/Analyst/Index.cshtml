@@ -1,0 +1,127 @@
+@model AnalystOverview
+@{
+    ViewData["Title"] = "Analyst";
+    var settings = Model.Settings;
+    var usage = Model.UsageToday;
+    var verdictFilters = new (AnalystVerdict? Verdict, string Label)[]
+    {
+        (null, "All"), (AnalystVerdict.Malicious, "Malicious"), (AnalystVerdict.NeedsAttention, "Needs attention"),
+        (AnalystVerdict.Benign, "Benign"), (AnalystVerdict.Failed, "Not assessed")
+    };
+}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h3 m-0">Analyst</h1>
+        <div class="text-body-secondary small">
+            Claude reviews everything the detectors flag, investigates it against this computer's history, and only puts in front of you what actually matters.
+        </div>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary" asp-controller="Settings" asp-action="Index" asp-route-tab="analyst">Analyst settings</a>
+</div>
+
+<partial name="_LearningBanner" model="Model.LearningPeriod" />
+
+@if (!settings.Enabled || !settings.HasApiKey)
+{
+    <div class="alert alert-warning">
+        <strong>The analyst is off.</strong>
+        @(settings.HasApiKey ? "Turn it on" : "Add an Anthropic API key and turn it on") under
+        <a asp-controller="Settings" asp-action="Index" asp-route-tab="analyst">Settings &rarr; Analyst</a>.
+        Until then you see the raw detector output, which includes false positives.
+    </div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3"><div class="card sw-stat h-100"><div class="sw-stat-label">Needs your attention</div><div class="sw-stat-value">@Model.OpenFindings.Count</div></div></div>
+    <div class="col-6 col-lg-3"><div class="card sw-stat h-100"><div class="sw-stat-label">Investigations today</div><div class="sw-stat-value">@usage.Investigations</div><div class="sw-stat-detail">limit @settings.MaximumInvestigationsPerHour per hour</div></div></div>
+    <div class="col-6 col-lg-3"><div class="card sw-stat h-100"><div class="sw-stat-label">Answered from memory</div><div class="sw-stat-value">@usage.Reused</div><div class="sw-stat-detail">no model call needed</div></div></div>
+    <div class="col-6 col-lg-3"><div class="card sw-stat h-100"><div class="sw-stat-label">Tokens today</div><div class="sw-stat-value">@Display.Number(usage.TotalTokens)</div><div class="sw-stat-detail">of @Display.Number(settings.DailyTokenBudget) budget &middot; @Display.Number(usage.CacheReadTokens) cached</div></div></div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Needs your attention</div>
+    <partial name="_AnalystFindings" model="Model.OpenFindings" />
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span>Everything the analyst looked at</span>
+        <div class="btn-group btn-group-sm">
+            @foreach (var (verdict, label) in verdictFilters)
+            {
+                <a class="btn @(Model.Filter == verdict ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-verdict="@verdict">@label</a>
+            }
+        </div>
+    </div>
+    @if (Model.RecentAssessments.Count == 0)
+    {
+        <p class="text-body-secondary small m-0 p-3">No assessments yet.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead><tr><th>Time</th><th>Verdict</th><th>Conclusion</th><th>Program</th><th>Destination</th><th class="text-end">Lookups</th></tr></thead>
+                <tbody>
+                    @foreach (var assessment in Model.RecentAssessments)
+                    {
+                        <tr>
+                            <td class="small text-nowrap">@Display.Time(assessment.CreatedAt)</td>
+                            <td>
+                                <span class="badge @assessment.VerdictBadgeClass">@assessment.VerdictLabel</span>
+                                @if (assessment.ReusedFromId.HasValue)
+                                {
+                                    <div class="small text-body-secondary">from memory</div>
+                                }
+                            </td>
+                            <td class="small">
+                                <details>
+                                    <summary><strong>@assessment.Title</strong></summary>
+                                    <div class="mt-1">@assessment.Explanation</div>
+                                    @if (!string.IsNullOrEmpty(assessment.RecommendedAction))
+                                    {
+                                        <div class="mt-1"><strong>Recommended:</strong> @assessment.RecommendedAction</div>
+                                    }
+                                    @if (assessment.FloorNote != null)
+                                    {
+                                        <div class="mt-1 text-body-secondary">@assessment.FloorNote</div>
+                                    }
+                                    @if (assessment.RememberUntil.HasValue)
+                                    {
+                                        <div class="mt-1 text-body-secondary">Remembered until @Display.Time(assessment.RememberUntil) while uploads stay under @Display.Bytes(assessment.EnvelopeBytesOutPerHour)/hour.</div>
+                                    }
+                                </details>
+                            </td>
+                            <td class="small sw-truncate sw-mono" title="@assessment.ProcessPath">@(assessment.ProcessPath == null ? "-" : System.IO.Path.GetFileName(assessment.ProcessPath))</td>
+                            <td class="small sw-truncate" title="@assessment.Destination">
+                                @if (assessment.RemoteIp != null)
+                                {
+                                    <a asp-controller="Addresses" asp-action="Details" asp-route-id="@assessment.RemoteIp" class="sw-mono">@assessment.RemoteIp</a>
+                                }
+                                <div class="text-body-secondary">@assessment.Destination</div>
+                            </td>
+                            <td class="text-end small">@assessment.ToolCalls</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<div class="card">
+    <div class="card-header">What normal looks like on this computer</div>
+    <div class="card-body small">
+        @if (string.IsNullOrEmpty(Model.BaselineProfile))
+        {
+            <p class="text-body-secondary mb-0">
+                The analyst writes a baseline profile once the learning period ends (@Display.Time(Model.LearningPeriod.EndsAt)) and refreshes it every @settings.BaselineRefreshDays days.
+            </p>
+        }
+        else
+        {
+            <div style="white-space: pre-wrap">@Model.BaselineProfile</div>
+            <div class="text-body-secondary mt-2">Written @Display.Time(DateTime.TryParse(Model.BaselineProfileWrittenAt, null, System.Globalization.DateTimeStyles.RoundtripKind, out var writtenAt) ? writtenAt : null)</div>
+        }
+    </div>
+</div>

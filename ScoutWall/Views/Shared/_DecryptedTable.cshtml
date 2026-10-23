@@ -1,0 +1,29 @@
+@model List<DecryptedRequest>
+@if (Model.Count == 0)
+{
+    <p class="text-body-secondary small m-0 p-3">No decrypted requests.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr><th>Time</th><th>Method</th><th>Host</th><th>Path</th><th>Client</th><th>Version</th><th>User agent</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var decryptedRequest in Model)
+                {
+                    <tr>
+                        <td class="small">@Display.Time(decryptedRequest.CapturedAt)</td>
+                        <td><span class="badge text-bg-secondary">@decryptedRequest.Method</span></td>
+                        <td class="sw-truncate" title="@decryptedRequest.Host">@decryptedRequest.Host</td>
+                        <td class="sw-mono sw-truncate" title="@decryptedRequest.Path">@decryptedRequest.Path</td>
+                        <td><a asp-controller="Addresses" asp-action="Details" asp-route-id="@decryptedRequest.ClientIp" class="sw-mono">@decryptedRequest.ClientIp</a></td>
+                        <td class="small">@decryptedRequest.HttpVersion</td>
+                        <td class="small sw-truncate" title="@decryptedRequest.UserAgent">@decryptedRequest.UserAgent</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

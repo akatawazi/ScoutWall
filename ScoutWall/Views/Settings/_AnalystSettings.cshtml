@@ -1,0 +1,101 @@
+@model SettingsOverview
+@{
+    var analyst = Model.Analyst;
+}
+<form method="post" asp-action="SaveAnalyst">
+    <input type="hidden" name="revision" value="@(Model.RevisionOf<AnalystSettings>())" />
+    <div class="card mb-4">
+        <div class="card-header">Analyst agent</div>
+        <div class="card-body row g-3">
+            <div class="col-12 small text-body-secondary">
+                Claude reviews what the detectors flag, investigates with read-only lookups into ScoutWall's own data, and decides what you need to see.
+                It never blocks anything itself, cannot dismiss blocklist, scan or name-leak alerts, and anything it closes stays listed on the Analyst page.
+                <strong>Sent to Anthropic:</strong> IP addresses, host and server names, program paths and publishers, byte counts and times. Never packet contents.
+            </div>
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" asp-for="Analyst.Enabled" />
+                    <label class="form-check-label" asp-for="Analyst.Enabled">Turn on the analyst</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="analyst-key">Anthropic API key</label>
+                <input class="form-control sw-mono" type="password" id="analyst-key" name="Analyst.ApiKey" autocomplete="off"
+                       placeholder="@(analyst.HasApiKey ? "Saved. Leave blank to keep it" : "sk-ant-...")" />
+                @if (analyst.HasApiKey)
+                {
+                    <div class="form-check mt-1">
+                        <input class="form-check-input" type="checkbox" id="clear-analyst-key" name="Analyst.ClearApiKey" value="true" />
+                        <label class="form-check-label small" for="clear-analyst-key">Remove the saved key</label>
+                    </div>
+                }
+                <div class="form-text">Create one at console.anthropic.com. Stored encrypted with Windows DPAPI.</div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label" asp-for="Analyst.Model">Model</label>
+                <select class="form-select" asp-for="Analyst.Model" asp-items="@(new SelectList(AnalystSettings.Models))"></select>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label" asp-for="Analyst.Effort">Effort</label>
+                <select class="form-select" asp-for="Analyst.Effort" asp-items="@(new SelectList(AnalystSettings.EffortLevels))"></select>
+                <div class="form-text">Higher looks harder and costs more.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Limits and memory</div>
+        <div class="card-body row g-3">
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Analyst.MaximumInvestigationsPerHour">Investigations per hour</label>
+                <input class="form-control" asp-for="Analyst.MaximumInvestigationsPerHour" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Analyst.DailyTokenBudget">Daily token budget</label>
+                <input class="form-control" asp-for="Analyst.DailyTokenBudget" />
+                <div class="form-text">Hard stop; resets at midnight UTC.</div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Analyst.RememberDays">Remember benign conclusions (days)</label>
+                <input class="form-control" asp-for="Analyst.RememberDays" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Analyst.ReopenVolumeMultiplier">Reopen when uploads exceed (×)</label>
+                <input class="form-control" asp-for="Analyst.ReopenVolumeMultiplier" step="0.5" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Analyst.SoftAlertGraceMinutes">Wait before blocking (minutes)</label>
+                <input class="form-control" asp-for="Analyst.SoftAlertGraceMinutes" />
+                <div class="form-text">Gives the analyst time to clear false positives.</div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Analyst.BaselineRefreshDays">Refresh baseline every (days)</label>
+                <input class="form-control" asp-for="Analyst.BaselineRefreshDays" />
+            </div>
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" asp-for="Analyst.NotifyFindings" />
+                    <label class="form-check-label" asp-for="Analyst.NotifyFindings">Send notifications for findings (uses the channels under Notifications)</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Web lookups</div>
+        <div class="card-body row g-3">
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" asp-for="Analyst.WebSearchEnabled" />
+                    <label class="form-check-label" asp-for="Analyst.WebSearchEnabled">Let the analyst search reputation sites for unfamiliar domains, networks and programs</label>
+                </div>
+                <div class="form-text">Off by default: an attacker can publish pages about their own domain. Searches are limited to the sites below.</div>
+            </div>
+            <div class="col-lg-6">
+                <label class="form-label" asp-for="Analyst.WebSearchDomainsText">Allowed sites (one per line)</label>
+                <textarea class="form-control sw-mono" asp-for="Analyst.WebSearchDomainsText" rows="5"></textarea>
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save analyst settings</button>
+</form>

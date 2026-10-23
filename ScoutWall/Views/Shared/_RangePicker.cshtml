@@ -1,0 +1,18 @@
+@model TimeRange
+@{
+    var actionName = ViewContext.RouteData.Values["action"]?.ToString();
+    var routeId = ViewContext.RouteData.Values["id"]?.ToString();
+    var keptValues = Context.Request.Query
+        .Where(pair => !string.Equals(pair.Key, "range", StringComparison.OrdinalIgnoreCase))
+        .ToDictionary(pair => pair.Key, pair => pair.Value.ToString());
+    if (routeId != null)
+        keptValues["id"] = routeId;
+}
+<div class="btn-group btn-group-sm sw-range" role="group" aria-label="Time range">
+    @foreach (var timeRange in TimeRange.All)
+    {
+        var routeValues = new Dictionary<string, string>(keptValues) { ["range"] = timeRange.Key };
+        <a class="btn @(timeRange.Key == Model.Key ? "btn-primary" : "btn-outline-secondary")"
+           asp-action="@actionName" asp-all-route-data="routeValues" title="@timeRange.Label">@timeRange.Key</a>
+    }
+</div>

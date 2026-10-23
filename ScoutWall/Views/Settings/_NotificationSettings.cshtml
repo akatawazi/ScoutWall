@@ -1,0 +1,121 @@
+@model SettingsOverview
+<form method="post" asp-action="SaveNotification">
+    <input type="hidden" name="revision" value="@(Model.RevisionOf<NotificationSettings>())" />
+    <div class="card mb-4">
+        <div class="card-header">Email</div>
+        <div class="card-body row g-3">
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" asp-for="Notification.EmailEnabled" />
+                    <label class="form-check-label" asp-for="Notification.EmailEnabled">Send email</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" asp-for="Notification.SmtpHost">SMTP server</label>
+                <input class="form-control" asp-for="Notification.SmtpHost" placeholder="smtp.example.com" />
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label" asp-for="Notification.SmtpPort">Port</label>
+                <input class="form-control" asp-for="Notification.SmtpPort" />
+            </div>
+            <div class="col-sm-6 col-md-3 d-flex align-items-end">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" asp-for="Notification.SmtpUseTls" />
+                    <label class="form-check-label" asp-for="Notification.SmtpUseTls">Use TLS</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" asp-for="Notification.SmtpUsername">Username</label>
+                <input class="form-control" asp-for="Notification.SmtpUsername" autocomplete="off" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="smtp-password">Password</label>
+                <input class="form-control" type="password" id="smtp-password" name="Notification.SmtpPassword" autocomplete="new-password"
+                       placeholder="@(Model.Notification.HasSmtpPassword ? "Saved. Leave blank to keep it" : "")" />
+                @if (Model.Notification.HasSmtpPassword)
+                {
+                    <div class="form-check mt-1">
+                        <input class="form-check-input" type="checkbox" id="clear-smtp-password" name="Notification.ClearSmtpPassword" value="true" />
+                        <label class="form-check-label small" for="clear-smtp-password">Remove the saved password</label>
+                    </div>
+                }
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" asp-for="Notification.EmailFrom">From address</label>
+                <input class="form-control" asp-for="Notification.EmailFrom" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" asp-for="Notification.EmailToText">Recipients (one per line)</label>
+                <textarea class="form-control" asp-for="Notification.EmailToText" rows="2"></textarea>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label" asp-for="Notification.EmailMinimumSeverity">Minimum severity</label>
+                <select class="form-select" asp-for="Notification.EmailMinimumSeverity" asp-items="Html.GetEnumSelectList<AlertSeverity>()"></select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Webhook (Slack, Teams, Discord or any JSON endpoint)</div>
+        <div class="card-body row g-3">
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" asp-for="Notification.WebhookEnabled" />
+                    <label class="form-check-label" asp-for="Notification.WebhookEnabled">Post to a webhook</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="webhook-url">Webhook URL</label>
+                <input class="form-control sw-mono" type="password" id="webhook-url" name="Notification.WebhookUrl" autocomplete="off"
+                       placeholder="@(Model.Notification.HasWebhookUrl ? "Saved. Leave blank to keep it" : "https://hooks.slack.com/services/...")" />
+                @if (Model.Notification.HasWebhookUrl)
+                {
+                    <div class="form-check mt-1">
+                        <input class="form-check-input" type="checkbox" id="clear-webhook" name="Notification.ClearWebhookUrl" value="true" />
+                        <label class="form-check-label small" for="clear-webhook">Remove the saved URL</label>
+                    </div>
+                }
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label" asp-for="Notification.WebhookFormat">Format</label>
+                <select class="form-select" asp-for="Notification.WebhookFormat" asp-items="Html.GetEnumSelectList<WebhookFormat>()"></select>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label" asp-for="Notification.WebhookMinimumSeverity">Minimum severity</label>
+                <select class="form-select" asp-for="Notification.WebhookMinimumSeverity" asp-items="Html.GetEnumSelectList<AlertSeverity>()"></select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Desktop</div>
+        <div class="card-body row g-3">
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" asp-for="Notification.DesktopEnabled" />
+                    <label class="form-check-label" asp-for="Notification.DesktopEnabled">Show a notification on this computer (needs the presence agent running in the user's session)</label>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label" asp-for="Notification.DesktopMinimumSeverity">Minimum severity</label>
+                <select class="form-select" asp-for="Notification.DesktopMinimumSeverity" asp-items="Html.GetEnumSelectList<AlertSeverity>()"></select>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label" asp-for="Notification.RepeatMinutes">Repeat at most every (minutes)</label>
+                <input class="form-control" asp-for="Notification.RepeatMinutes" />
+            </div>
+        </div>
+    </div>
+    <p class="small text-body-secondary">The SMTP password and webhook URL are encrypted with Windows DPAPI. They protect a copied database file, not against an administrator on this computer.</p>
+    <button type="submit" class="btn btn-primary">Save notification settings</button>
+</form>
+
+<div class="d-flex flex-wrap gap-2 mt-4">
+    @foreach (var channel in Enum.GetValues<NotificationChannel>())
+    {
+        <form method="post" asp-action="TestNotification">
+            <input type="hidden" name="channel" value="@channel" />
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Send test @channel.ToString().ToLowerInvariant() notification</button>
+        </form>
+    }
+</div>

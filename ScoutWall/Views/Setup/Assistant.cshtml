@@ -1,0 +1,83 @@
+@model SettingsOverview
+@{
+    ViewData["Title"] = "Your assistant";
+    var analyst = Model.Analyst;
+    var current = analyst.Enabled ? analyst.Provider : AnalystProvider.None;
+}
+<div class="sw-setup mx-auto">
+    <partial name="_SetupProgress" model="3" />
+    <h1 class="h3">Who should look over what ScoutWall finds?</h1>
+    <p class="text-body-secondary">
+        An AI assistant reviews everything ScoutWall flags, so you only hear about what actually matters, in plain words.
+        You can also ask it questions and change settings by chatting.
+    </p>
+
+    <form method="post" asp-action="Assistant" asp-route-fromSettings="@(Context.Request.Query["fromSettings"].ToString() is { Length: > 0 } fromSettings ? fromSettings : null)">
+        <div class="d-grid gap-2 mb-3">
+            <label class="card sw-choice" for="assistant-claude">
+                <div class="card-body d-flex gap-3">
+                    <input class="form-check-input mt-1" type="radio" name="Analyst.Provider" id="assistant-claude" value="@AnalystProvider.Claude" checked="@(current == AnalystProvider.Claude)" />
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">Claude by Anthropic <span class="badge text-bg-success ms-1">most thorough</span></div>
+                        <div class="small text-body-secondary mb-2">Investigates each finding in depth and can make changes for you when you ask (you always confirm).</div>
+                        <input class="form-control form-control-sm sw-mono" type="password" name="Analyst.ApiKey" autocomplete="off"
+                               placeholder="@(analyst.HasClaudeKey ? "Key saved; leave blank to keep it" : "Anthropic API key (sk-ant-...)")" />
+                    </div>
+                </div>
+            </label>
+            <label class="card sw-choice" for="assistant-openai">
+                <div class="card-body d-flex gap-3">
+                    <input class="form-check-input mt-1" type="radio" name="Analyst.Provider" id="assistant-openai" value="@AnalystProvider.OpenAi" checked="@(current == AnalystProvider.OpenAi)" />
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">ChatGPT by OpenAI</div>
+                        <div class="small text-body-secondary mb-2">Reviews findings and answers questions.</div>
+                        <div class="row g-2">
+                            <div class="col-sm-8"><input class="form-control form-control-sm sw-mono" type="password" name="Analyst.OpenAiApiKey" autocomplete="off" placeholder="@(analyst.HasOpenAiKey ? "Key saved; leave blank to keep it" : "OpenAI API key (sk-...)")" /></div>
+                            <div class="col-sm-4"><input class="form-control form-control-sm sw-mono" name="Analyst.OpenAiModel" value="@analyst.OpenAiModel" aria-label="OpenAI model" /></div>
+                        </div>
+                    </div>
+                </div>
+            </label>
+            <label class="card sw-choice" for="assistant-openrouter">
+                <div class="card-body d-flex gap-3">
+                    <input class="form-check-input mt-1" type="radio" name="Analyst.Provider" id="assistant-openrouter" value="@AnalystProvider.OpenRouter" checked="@(current == AnalystProvider.OpenRouter)" />
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">OpenRouter <span class="badge text-bg-secondary ms-1">low cost</span></div>
+                        <div class="small text-body-secondary mb-2">Uses the open GPT-OSS 20B model by default. Reviews findings and answers questions.</div>
+                        <div class="row g-2">
+                            <div class="col-sm-8"><input class="form-control form-control-sm sw-mono" type="password" name="Analyst.OpenRouterApiKey" autocomplete="off" placeholder="@(analyst.HasOpenRouterKey ? "Key saved; leave blank to keep it" : "OpenRouter API key (sk-or-...)")" /></div>
+                            <div class="col-sm-4"><input class="form-control form-control-sm sw-mono" name="Analyst.OpenRouterModel" value="@analyst.OpenRouterModel" aria-label="OpenRouter model" /></div>
+                        </div>
+                    </div>
+                </div>
+            </label>
+            <label class="card sw-choice" for="assistant-local">
+                <div class="card-body d-flex gap-3">
+                    <input class="form-check-input mt-1" type="radio" name="Analyst.Provider" id="assistant-local" value="@AnalystProvider.LocalModel" checked="@(current == AnalystProvider.LocalModel)" />
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">A model on this computer <span class="badge text-bg-secondary ms-1">private</span></div>
+                        <div class="small text-body-secondary mb-2">Nothing leaves your network. Needs Ollama or LM Studio running with a model downloaded (for example <code>ollama pull gpt-oss:20b</code>).</div>
+                        <div class="row g-2">
+                            <div class="col-sm-8"><input class="form-control form-control-sm sw-mono" name="Analyst.LocalEndpoint" value="@analyst.LocalEndpoint" aria-label="Local model address" /></div>
+                            <div class="col-sm-4"><input class="form-control form-control-sm sw-mono" name="Analyst.LocalModel" value="@analyst.LocalModel" aria-label="Local model name" /></div>
+                        </div>
+                    </div>
+                </div>
+            </label>
+            <label class="card sw-choice" for="assistant-none">
+                <div class="card-body d-flex gap-3">
+                    <input class="form-check-input mt-1" type="radio" name="Analyst.Provider" id="assistant-none" value="@AnalystProvider.None" checked="@(current == AnalystProvider.None)" />
+                    <div><div class="fw-semibold">Not now</div><div class="small text-body-secondary">ScoutWall still watches and alerts, but you'll see every raw alert, including false alarms.</div></div>
+                </div>
+            </label>
+        </div>
+        <p class="small text-body-secondary mb-4">
+            <strong>What the online assistants see:</strong> addresses, website and program names, and how much data moved, never the contents of your traffic.
+            A group of ScoutWall computers sharing one assistant is coming in a later update.
+        </p>
+        <div class="d-flex justify-content-between">
+            <a class="btn btn-link" asp-action="Protect">Back</a>
+            <button type="submit" class="btn btn-primary btn-lg">Continue</button>
+        </div>
+    </form>
+</div>

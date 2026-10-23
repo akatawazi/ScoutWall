@@ -1,0 +1,108 @@
+@model HomeReport
+@{
+    ViewData["Title"] = "Home";
+    var statusClass = Model.Status switch
+    {
+        HomeStatus.Danger => "sw-status-red",
+        HomeStatus.NeedsAttention => "sw-status-amber",
+        HomeStatus.AllGood => "sw-status-green",
+        _ => "sw-status-grey"
+    };
+    var statusIcon = Model.Status switch
+    {
+        HomeStatus.Danger => "!",
+        HomeStatus.NeedsAttention => "•",
+        HomeStatus.AllGood => "✓",
+        _ => "–"
+    };
+    var largestApp = Math.Max(1, Model.TopApps.Count == 0 ? 1 : Model.TopApps.Max(app => app.TotalBytes));
+}
+<div data-auto-refresh="60" class="sw-home mx-auto">
+    <div class="card sw-hero sw-status-card @statusClass mb-4">
+        <div class="card-body d-flex gap-4 align-items-center p-4 p-md-5">
+            <div class="sw-status-icon" aria-hidden="true">@statusIcon</div>
+            <div>
+                <h1 class="h3 mb-1">@Model.Headline</h1>
+                <div class="text-body-secondary">@Model.Detail</div>
+            </div>
+        </div>
+    </div>
+
+    <partial name="_LearningBanner" model="Model.LearningPeriod" />
+
+    <form method="post" asp-controller="Chat" asp-action="Send" class="card mb-4" data-busy-text="Thinking…">
+        <div class="card-body">
+            <label for="home-question" class="form-label fw-semibold">Ask ScoutWall</label>
+            <div class="input-group">
+                <input id="home-question" name="message" class="form-control form-control-lg" maxlength="2000"
+                       placeholder="@(Model.AssistantReady ? "For example: what sent data while I was away?" : "Set up an assistant to ask questions")" @(Model.AssistantReady ? "" : "disabled") />
+                <button type="submit" class="btn btn-primary" @(Model.AssistantReady ? "" : "disabled")>Ask</button>
+            </div>
+            @if (!Model.AssistantReady)
+            {
+                <div class="form-text"><a asp-controller="Setup" asp-action="Assistant">Choose an assistant</a> to ask questions and change settings by chatting.</div>
+            }
+        </div>
+    </form>
+
+    @if (Model.Findings.Count > 0)
+    {
+        <h2 class="h5">What needs you</h2>
+        <div class="card mb-4">
+            <partial name="_AnalystFindings" model="Model.Findings" />
+        </div>
+    }
+    else if (Model.UnreviewedAlerts.Count > 0)
+    {
+        <h2 class="h5">Recent alerts</h2>
+        <div class="card mb-4">
+            <partial name="_AlertTable" model="Model.UnreviewedAlerts" />
+            <div class="card-body small text-body-secondary border-top">These haven't been reviewed by an assistant, so some may be false alarms.</div>
+        </div>
+    }
+
+    <h2 class="h5">Today</h2>
+    <div class="card mb-4">
+        <ul class="list-group list-group-flush">
+            @foreach (var sentence in Model.TodaySentences)
+            {
+                <li class="list-group-item">@sentence</li>
+            }
+        </ul>
+    </div>
+
+    <h2 class="h5">Apps using the internet today</h2>
+    <div class="card mb-4">
+        @if (Model.TopApps.Count == 0)
+        {
+            <p class="text-body-secondary small m-0 p-3">No app activity recorded yet today.</p>
+        }
+        else
+        {
+            <ul class="list-group list-group-flush">
+                @foreach (var app in Model.TopApps)
+                {
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <a asp-controller="Programs" asp-action="Details" asp-route-id="@app.ProcessImageId" class="fw-semibold text-decoration-none">
+                                @app.Name
+                                @if (app.IsNew)
+                                {
+                                    <span class="badge bg-warning text-dark ms-1">New</span>
+                                }
+                            </a>
+                            <span class="small text-body-secondary">@HomeReport.Bytes(app.TotalBytes)</span>
+                        </div>
+                        @if (app.Publisher != null)
+                        {
+                            <div class="small text-body-secondary">by @app.Publisher</div>
+                        }
+                        <div class="sw-bar-track mt-1"><div class="sw-bar-fill" style="width: @(app.TotalBytes * 100 / largestApp)%; background: var(--sw-series-1)"></div></div>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+
+    <p class="small text-body-secondary text-center">@Model.HealthLine</p>
+</div>

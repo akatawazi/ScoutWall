@@ -1,0 +1,48 @@
+@model SettingsOverview
+@{
+    ViewData["Title"] = "Settings";
+}
+<h1 class="h3 mb-3">Settings</h1>
+
+<ul class="nav nav-tabs mb-4">
+    @foreach (var (key, label) in SettingsOverview.Tabs)
+    {
+        <li class="nav-item">
+            <a class="nav-link @(Model.Tab == key ? "active" : "")" asp-action="Index" asp-route-tab="@key">@label</a>
+        </li>
+    }
+</ul>
+
+@switch (Model.Tab)
+{
+    case "capture":
+        <partial name="_CaptureSettings" model="Model" />
+        break;
+    case "response":
+        <partial name="_ResponseSettings" model="Model" />
+        break;
+    case "detection":
+        <partial name="_DetectionSettings" model="Model" />
+        break;
+    case "protection":
+        <partial name="_ProtectionSettings" model="Model" />
+        break;
+    case "analyst":
+        <partial name="_AnalystSettings" model="Model" />
+        break;
+    case "analysis":
+        <partial name="_AnalysisSettings" model="Model" />
+        break;
+    case "notifications":
+        <partial name="_NotificationSettings" model="Model" />
+        break;
+    case "integrations":
+        <partial name="_IntegrationSettings" model="Model" />
+        break;
+    case "retention":
+        <partial name="_RetentionSettings" model="Model" />
+        break;
+    case "users":
+        <partial name="_UserSettings" model="Model" />
+        break;
+}

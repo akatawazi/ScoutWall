@@ -1,0 +1,82 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    The one ScoutWall executable: web console, sensor, presence agent (Windows), installer and rescue tool, chosen by
+    the first argument (see Program.cs). net10.0-windows is the Windows build; net10.0 is the Linux build.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net10.0-windows;net10.0</TargetFrameworks>
+    <AssemblyName>scoutwall</AssemblyName>
+    <RootNamespace>ScoutWall</RootNamespace>
+    <Nullable>enable</Nullable>
+    <!-- Lets the Linux build machine restore the Windows target too. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>0.1.0</Version>
+    <Product>ScoutWall</Product>
+    <Company>Blue Shift Technologies</Company>
+    <Copyright>Copyright (c) 2026 Blue Shift Technologies. MIT License.</Copyright>
+    <!-- wwwroot is embedded in the program (served by ManifestEmbeddedFileProvider), not copied beside it. -->
+    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+    <ApplicationIcon>..\ScoutWall.Presence\scout.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!--
+    Single self-contained file: dotnet publish -c Release -r win-x64 (or linux-x64) -p:PublishSingleFile=true.
+    Never trimmed: EF Core, COM automation and Razor need the full framework. Static files and settings ride inside
+    the bundle and are unpacked on first start to DOTNET_BUNDLE_EXTRACT_BASE_DIR (set by "scoutwall install").
+  -->
+  <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
+    <SelfContained>true</SelfContained>
+    <PublishTrimmed>false</PublishTrimmed>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
+    <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
+  </PropertyGroup>
+
+  <!-- ASP.NET keeps static files, settings and the static-asset manifest beside the executable by default; for the
+       single file they go inside the bundle too (debug symbols are embedded in the assemblies instead). -->
+  <Target Name="BundleWebContent" BeforeTargets="_ComputeFilesToBundle" Condition="'$(PublishSingleFile)' == 'true'">
+    <ItemGroup>
+      <ResolvedFileToPublish Update="@(ResolvedFileToPublish)" ExcludeFromSingleFile="false" Condition="'%(Extension)' != '.pdb'" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.pdb' Or '%(Filename)%(Extension)' == 'appsettings.Development.json' Or '%(Filename)%(Extension)' == 'web.config'" />
+    </ItemGroup>
+  </Target>
+
+  <ItemGroup>
+    <EmbeddedResource Include="wwwroot\**" />
+    <Content Update="wwwroot\**" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.13" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ScoutWall.Data\ScoutWall.Data.csproj" />
+    <ProjectReference Include="..\ScoutWall.Intelligence\ScoutWall.Intelligence.csproj" />
+    <ProjectReference Include="..\ScoutWall.Sensor\ScoutWall.Sensor.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+    <ProjectReference Include="..\ScoutWall.Presence\ScoutWall.Presence.csproj" />
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
+  </ItemGroup>
+
+</Project>

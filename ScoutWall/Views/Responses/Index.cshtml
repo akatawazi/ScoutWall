@@ -1,0 +1,126 @@
+@model ResponseOverview
+@{
+    ViewData["Title"] = "Responses";
+    var activeCount = Model.Actions.Count(action => action.IsDesired && !action.IsHostAction);
+}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h3 m-0">Responses</h1>
+        <div class="text-body-secondary small">
+            Mode <strong>@Model.Response.Mode</strong>@(Model.Response.DryRun ? " in dry run: automatic actions are recorded as Simulated and not applied" : "").
+            <a asp-controller="Settings" asp-action="Index" asp-route-tab="response">Change</a>
+        </div>
+    </div>
+    <form method="post" asp-action="RevokeAll" data-confirm="Remove every ScoutWall network block and slow-down now? Disabled or removed scheduled tasks and stopped services stay as they are; undo those one at a time below.">
+        <button type="submit" class="btn btn-danger" @(activeCount == 0 ? "disabled" : "")>Remove all blocks (@activeCount active)</button>
+    </form>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">Block or throttle manually</div>
+            <div class="card-body">
+                <form method="post" asp-action="Create" class="row g-2">
+                    <div class="col-sm-4">
+                        <label class="form-label small" for="actionType">Action</label>
+                        <select class="form-select form-select-sm" id="actionType" name="actionType">
+                            <option value="@ResponseActionType.BlockAddress">Block address</option>
+                            <option value="@ResponseActionType.ThrottleAddress">Throttle address</option>
+                            <option value="@ResponseActionType.BlockProgram">Block program</option>
+                            <option value="@ResponseActionType.ThrottleProgram">Throttle program</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-5">
+                        <label class="form-label small" for="target">IP address or program path</label>
+                        <input class="form-control form-control-sm" id="target" name="target" required />
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label small" for="durationMinutes">For</label>
+                        <select class="form-select form-select-sm" id="durationMinutes" name="durationMinutes">
+                            <option value="60">1 hour</option>
+                            <option value="1440">1 day</option>
+                            <option value="10080">7 days</option>
+                            <option value="0">Until revoked</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">How responses work</div>
+            <div class="card-body small">
+                <ul class="mb-0">
+                    <li>The sensor applies blocks through Windows Defender Firewall rules in the <strong>ScoutWall</strong> group, and throttles through Windows QoS policies (outbound only).</li>
+                    <li>This list is the source of truth: the sensor adds anything missing and removes anything revoked or expired every few seconds.</li>
+                    <li>Local, private, gateway and DNS addresses and allowlisted programs are never blocked automatically.</li>
+                    <li>If the sensor is not running, run <code>scoutwall rescue</code> from an administrator prompt to remove every ScoutWall rule.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Blocked scanners (@Model.ScannerBlockCount)</span>
+        @if (Model.ScannerBlockCount > 0)
+        {
+            <form method="post" asp-action="UnblockScanner" data-confirm="Unblock all @Model.ScannerBlockCount scanner addresses?">
+                <button type="submit" class="btn btn-sm sw-block-button">Unblock all</button>
+            </form>
+        }
+    </div>
+    @if (Model.ScannerBlocks.Count == 0)
+    {
+        <p class="text-body-secondary small m-0 p-3">No internet scanners are blocked. Addresses that scan this computer or touch a decoy port are blocked here for a while, all through one firewall rule.@(Model.Response.DryRun ? " Practice mode is on, so the list is kept but not enforced." : "")</p>
+    }
+    else
+    {
+        @if (Model.Response.DryRun)
+        {
+            <p class="small text-warning-emphasis m-0 px-3 pt-2">Practice mode is on, so these addresses are listed but not actually blocked.</p>
+        }
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0" data-sortable="scanner-blocks">
+                <thead>
+                    <tr>
+                        <th data-sort="text">Address</th>
+                        <th data-sort="text">Why</th>
+                        <th class="text-end" data-sort="number">Times</th>
+                        <th data-sort="number">Last seen</th>
+                        <th data-sort="number">Blocked until</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var scannerBlock in Model.ScannerBlocks)
+                    {
+                        <tr>
+                            <td><a asp-controller="Addresses" asp-action="Details" asp-route-id="@scannerBlock.IpAddress" class="sw-mono">@scannerBlock.IpAddress</a></td>
+                            <td class="small sw-truncate" title="@scannerBlock.Reason">@scannerBlock.Reason</td>
+                            <td class="text-end small" data-sort-value="@scannerBlock.HitCount">@scannerBlock.HitCount</td>
+                            <td class="small" data-sort-value="@scannerBlock.LastSeenAt.Ticks">@Display.Time(scannerBlock.LastSeenAt)</td>
+                            <td class="small" data-sort-value="@scannerBlock.ExpiresAt.Ticks">@Display.Time(scannerBlock.ExpiresAt)</td>
+                            <td class="text-end">
+                                <form method="post" asp-action="UnblockScanner" asp-route-id="@scannerBlock.Id">
+                                    <button type="submit" class="btn btn-sm sw-block-button">Unblock</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<div class="card">
+    <div class="card-header">Actions</div>
+    <partial name="_ResponseTable" model="Model.Actions" />
+</div>

@@ -1,0 +1,11 @@
+@model (long Here, long Away, long Unknown)
+@* Two table cells: bytes while someone was at the computer and while away. Traffic from times ScoutWall couldn't
+   tell is listed under the "here" figure rather than silently counted as either. *@
+<td class="text-end" data-sort-value="@Model.Here">
+    @Display.Bytes(Model.Here)
+    @if (Model.Unknown > 0)
+    {
+        <div class="small text-body-secondary text-nowrap" title="ScoutWall couldn't tell whether anyone was at the computer for this part">+@Display.Bytes(Model.Unknown) unknown</div>
+    }
+</td>
+<td class="text-end sw-away-bytes" data-sort-value="@Model.Away">@Display.Bytes(Model.Away)</td>

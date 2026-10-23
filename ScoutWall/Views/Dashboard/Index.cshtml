@@ -1,0 +1,139 @@
+@model DashboardReport
+@{
+    ViewData["Title"] = "Dashboard";
+    var traffic = Model.Traffic;
+}
+<div data-auto-refresh="30">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <h1 class="h3 m-0">Dashboard</h1>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-link text-body-secondary" data-auto-refresh-toggle></button>
+            <partial name="_RangePicker" model="traffic.Range" />
+        </div>
+    </div>
+
+    <partial name="_SensorStatus" model="Model.Sensors" />
+    <partial name="_LearningBanner" model="Model.LearningPeriod" />
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between">
+            <span>Needs your attention</span>
+            <a asp-controller="Analyst" asp-action="Index" class="small">Analyst</a>
+        </div>
+        @if (Model.AnalystReady)
+        {
+            <partial name="_AnalystFindings" model="Model.AnalystFindings" />
+        }
+        else
+        {
+            <p class="small m-0 p-3">
+                The analyst agent is off, so the alerts below are raw detector output and include false positives.
+                <a asp-controller="Settings" asp-action="Index" asp-route-tab="analyst">Turn on the analyst</a> to have Claude review them and only show what matters.
+            </p>
+        }
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="card h-100 sw-stat">
+                <div class="sw-stat-label">Open alerts</div>
+                <div class="sw-stat-value">@Display.Number(Model.OpenAlertCount)</div>
+                <div class="sw-stat-detail">
+                    @foreach (var severityCount in Model.SeverityCounts.OrderByDescending(item => item.Key).Where(item => item.Value > 0))
+                    {
+                        <span class="me-2"><partial name="_Severity" model="severityCount.Key" /> @severityCount.Value</span>
+                    }
+                    @if (Model.SeverityCounts.Values.All(count => count == 0))
+                    {
+                        <span>None in @traffic.Range.Label.ToLowerInvariant()</span>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card h-100 sw-stat">
+                <div class="sw-stat-label">Incoming</div>
+                <div class="sw-stat-value">@Display.Bytes(traffic.Totals.BytesIn)</div>
+                <div class="sw-stat-detail">@Display.Number(traffic.Totals.PacketsIn) packets &middot; @Display.Number(traffic.Totals.InboundConnectionCount) inbound connections</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card h-100 sw-stat">
+                <div class="sw-stat-label">Outgoing</div>
+                <div class="sw-stat-value">@Display.Bytes(traffic.Totals.BytesOut)</div>
+                <div class="sw-stat-detail">@Display.Number(traffic.Totals.PacketsOut) packets</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card h-100 sw-stat">
+                <div class="sw-stat-label">Remote addresses</div>
+                <div class="sw-stat-value">@Display.Number(traffic.Totals.UniqueRemoteAddresses)</div>
+                <div class="sw-stat-detail">
+                    <a asp-controller="Responses" asp-action="Index">@Model.ActiveResponseCount active blocks</a> &middot; mode @Model.Response.Mode@(Model.Response.DryRun ? " (dry run)" : "")
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+            <div class="card h-100">
+                <div class="card-header">Traffic over time</div>
+                <div class="card-body">
+                    <div class="sw-chart"><canvas data-chart="traffic-timeline" aria-label="Incoming and outgoing bytes over time" role="img"></canvas></div>
+                    <script type="application/json" id="traffic-timeline">@Display.ChartData(Charts.TrafficTimeline(traffic.Timeline))</script>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">Traffic by country</div>
+                <div class="card-body">
+                    <div class="sw-chart"><canvas data-chart="country-chart" aria-label="Traffic by remote country" role="img"></canvas></div>
+                    <script type="application/json" id="country-chart">@Display.ChartData(Charts.Countries(traffic.TopCountries))</script>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between">
+            <span>Latest detector alerts</span>
+            <a asp-controller="Alerts" asp-action="Index" class="small">All alerts</a>
+        </div>
+        <partial name="_AlertTable" model="Model.RecentAlerts" />
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-xl-6">
+            <div class="card h-100">
+                <div class="card-header">Where incoming traffic comes from</div>
+                <partial name="_AddressTable" model="traffic.TopSources" />
+            </div>
+        </div>
+        <div class="col-xl-6">
+            <div class="card h-100">
+                <div class="card-header">Where outgoing traffic goes</div>
+                <partial name="_AddressTable" model="traffic.TopDestinations" />
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-xl-6">
+            <div class="card h-100">
+                <div class="card-header">Top services</div>
+                <partial name="_ServiceTable" model="traffic.TopServices" />
+            </div>
+        </div>
+        <div class="col-xl-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between">
+                    <span>Programs sending the most data</span>
+                    <a asp-controller="Programs" asp-action="Index" class="small">Data Flow</a>
+                </div>
+                <partial name="_ProgramTable" model="Model.TopPrograms" view-data='@(new ViewDataDictionary(ViewData) { ["Compact"] = true })' />
+            </div>
+        </div>
+    </div>
+</div>

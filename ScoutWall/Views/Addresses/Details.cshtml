@@ -1,0 +1,113 @@
+@model IpAddressReport
+@{
+    var profile = Model.Profile;
+    ViewData["Title"] = profile.IpAddress;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h3 m-0 sw-mono">@profile.IpAddress</h1>
+        <div class="text-body-secondary">
+            @profile.LocationDisplay &middot; @profile.IspDisplay
+            @if (profile.IsBlocklisted)
+            {
+                <span class="badge bg-danger ms-1">Blocklisted by @profile.BlocklistSource</span>
+            }
+        </div>
+    </div>
+    <partial name="_RangePicker" model="Model.Range" />
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">Who is this</div>
+            <div class="card-body">
+                <dl class="row small mb-0">
+                    <dt class="col-5">Country</dt><dd class="col-7">@(profile.CountryName ?? "-") @profile.CountryCode</dd>
+                    <dt class="col-5">Region / city</dt><dd class="col-7">@(profile.Region ?? "-") / @(profile.City ?? "-")</dd>
+                    <dt class="col-5">ISP</dt><dd class="col-7">@(profile.Isp ?? "-")</dd>
+                    <dt class="col-5">Organization</dt><dd class="col-7">@(profile.Organization ?? "-")</dd>
+                    <dt class="col-5">Network (AS)</dt><dd class="col-7">@profile.AutonomousSystemDisplay</dd>
+                    <dt class="col-5">Reverse DNS</dt><dd class="col-7 text-break">@(profile.ReverseDns ?? "-")</dd>
+                    <dt class="col-5">Coordinates</dt><dd class="col-7">@(profile.Latitude.HasValue ? $"{profile.Latitude:0.00}, {profile.Longitude:0.00}" : "-")</dd>
+                    <dt class="col-5">First seen</dt><dd class="col-7">@Display.Time(profile.FirstSeenAt == default ? null : profile.FirstSeenAt)</dd>
+                    <dt class="col-5">Last seen</dt><dd class="col-7">@Display.Time(profile.LastSeenAt == default ? null : profile.LastSeenAt)</dd>
+                    <dt class="col-5">Lookup</dt><dd class="col-7">@(profile.LookupSource ?? (profile.IsPrivate ? "Private address" : "Pending")) @profile.LookupError</dd>
+                </dl>
+                @if (Model.Hostnames.Count > 0)
+                {
+                    <h2 class="h6 mt-3">Names seen in DNS answers</h2>
+                    <ul class="small mb-0">
+                        @foreach (var dnsRecord in Model.Hostnames)
+                        {
+                            <li>@dnsRecord.Hostname <span class="text-body-secondary">(@dnsRecord.SeenCount×)</span></li>
+                        }
+                    </ul>
+                }
+                <form method="post" asp-controller="Responses" asp-action="Create" class="mt-3">
+                    <input type="hidden" name="actionType" value="@ResponseActionType.BlockAddress" />
+                    <input type="hidden" name="target" value="@profile.IpAddress" />
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                    <div class="input-group input-group-sm">
+                        <select name="durationMinutes" class="form-select" aria-label="Duration">
+                            <option value="60">1 hour</option>
+                            <option value="1440">1 day</option>
+                            <option value="0">Until revoked</option>
+                        </select>
+                        <button type="submit" class="btn btn-danger">Block address</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header">Traffic with this address: @Display.Bytes(Model.Totals.BytesIn) in, @Display.Bytes(Model.Totals.BytesOut) out</div>
+            <div class="card-body">
+                <div class="sw-chart"><canvas data-chart="address-timeline" aria-label="Traffic with this address over time" role="img"></canvas></div>
+                <script type="application/json" id="address-timeline">@Display.ChartData(Charts.TrafficTimeline(Model.Timeline))</script>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-xl-6">
+        <div class="card h-100">
+            <div class="card-header">Talked to</div>
+            <partial name="_AddressTable" model="Model.Peers" />
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="card h-100">
+            <div class="card-header">Services</div>
+            <partial name="_ServiceTable" model="Model.Services" />
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Programs on this computer that talked to it</div>
+    <partial name="_ProgramTable" model="Model.Programs" view-data='@(new ViewDataDictionary(ViewData) { ["Compact"] = true })' />
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Alerts</div>
+    <partial name="_AlertTable" model="Model.Alerts" />
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-6">
+        <div class="card h-100">
+            <div class="card-header">TLS connections</div>
+            <partial name="_TlsTable" model="Model.TlsSessions" />
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="card h-100">
+            <div class="card-header">Decrypted requests</div>
+            <partial name="_DecryptedTable" model="Model.DecryptedRequests" />
+        </div>
+    </div>
+</div>

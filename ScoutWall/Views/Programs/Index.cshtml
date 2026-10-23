@@ -1,0 +1,171 @@
+@model DataBleedReport
+@{
+    ViewData["Title"] = "Data Flow";
+    var mapDots = WorldMap.Dots(Model.Locations);
+    var largestCountryBytes = Model.Countries.Count == 0 ? 1 : Math.Max(1, Model.Countries.Max(country => country.TotalBytes));
+    var sensor = Model.Sensors.FirstOrDefault();
+    var totals = Model.Totals;
+}
+<div data-auto-refresh="60">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <div>
+            <h1 class="h3 m-0">Data Flow</h1>
+            <div class="text-body-secondary small">Where this computer's data goes, which programs send it, and how much leaves while nobody is using it.</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-link text-body-secondary" data-auto-refresh-toggle></button>
+            <partial name="_RangePicker" model="Model.Range" />
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="card sw-stat h-100">
+                <div class="sw-stat-label">Uploaded</div>
+                <div class="sw-stat-value">@Display.Bytes(totals.BytesSent)</div>
+                <div class="sw-stat-detail">
+                    @Display.Bytes(totals.HereBytesSent) while you were here<br />
+                    <strong>@Display.Bytes(totals.AwayBytesSent) while away</strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card sw-stat h-100">
+                <div class="sw-stat-label">Downloaded</div>
+                <div class="sw-stat-value">@Display.Bytes(totals.BytesReceived)</div>
+                <div class="sw-stat-detail">
+                    @Display.Bytes(totals.HereBytesReceived) while you were here<br />
+                    <strong>@Display.Bytes(totals.AwayBytesReceived) while away</strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card sw-stat h-100">
+                <div class="sw-stat-label">Someone at the computer?</div>
+                <div class="sw-stat-value">@(sensor?.IsUserIdle switch { true => "Away", false => "Yes", _ => "Unknown" })</div>
+                <div class="sw-stat-detail">Run the presence agent in each user session for accurate input tracking</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card sw-stat h-100">
+                <div class="sw-stat-label">Idle alert threshold</div>
+                <div class="sw-stat-value">@Model.Detection.IdleDataBleedMegabytesPerTenMinutes MB</div>
+                <div class="sw-stat-detail">per program per 10 minutes &middot; mode @Model.Response.Mode</div>
+            </div>
+        </div>
+    </div>
+
+    <p class="small text-body-secondary mb-4">
+        Totals are for programs on this computer. <em>Away</em> means no keyboard or mouse use for @Model.Response.IdleMinutes minutes or more,
+        so the first @Model.Response.IdleMinutes minutes after you step away still count as here.
+        @if (totals.UnknownShare > 0)
+        {
+            <span>ScoutWall couldn't tell whether anyone was at the computer for @Display.Percent(totals.UnknownShare) of this traffic (usually while the presence agent wasn't running); that part is shown as <em>unknown</em>.</span>
+        }
+    </p>
+
+    <partial name="_AwayCard" model="Model" />
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Where your data goes</span>
+                    <span class="small text-body-secondary">Locations are approximate</span>
+                </div>
+                <div class="card-body">
+                    <div class="sw-world-map" data-world-map>
+                        <svg viewBox="@WorldMap.ViewBox" role="img" aria-label="World map of places this computer exchanged data with. The country list next to it has the same information.">
+                            <image href="@Url.Content("~/img/world-map.svg")" width="@WorldMap.Width" height="@WorldMap.Height" class="sw-map-land" />
+                            @foreach (var dot in mapDots)
+                            {
+                                <a href="@Url.Action("Details", "Addresses", new { id = dot.Location.LargestAddress })" aria-label="@dot.Label" data-map-label="@dot.Label">
+                                    <circle cx="@dot.X" cy="@dot.Y" r="@dot.Radius" class="sw-map-dot" />
+                                </a>
+                            }
+                        </svg>
+                        <div class="sw-map-tooltip" role="status" hidden></div>
+                        @if (mapDots.Count == 0)
+                        {
+                            <p class="sw-map-empty text-body-secondary small m-0">No locations yet. Addresses are looked up a few minutes after they're first seen.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">Top countries</div>
+                @if (Model.Countries.Count == 0)
+                {
+                    <p class="text-body-secondary small m-0 p-3">No countries yet.</p>
+                }
+                else
+                {
+                    <ul class="list-unstyled m-0 p-3 sw-country-list">
+                        @foreach (var country in Model.Countries)
+                        {
+                            var countryPrograms = Model.ProgramsByCountry.GetValueOrDefault(country.CountryCode) ?? [];
+                            <li class="sw-country" tabindex="0" aria-describedby="country-apps-@country.CountryCode">
+                                <div class="d-flex justify-content-between gap-2 small">
+                                    <span>@country.CountryName</span>
+                                    <span class="text-body-secondary text-nowrap">@Display.Bytes(country.TotalBytes)</span>
+                                </div>
+                                <div class="sw-bar-track">
+                                    <div class="sw-bar-fill" style="width: @((int)Math.Max(2, country.TotalBytes * 100 / largestCountryBytes))%"></div>
+                                </div>
+                                <div class="sw-country-apps" id="country-apps-@country.CountryCode" role="tooltip">
+                                    <div class="sw-country-apps-title">@Display.Bytes(country.BytesOut) uploaded, @Display.Bytes(country.BytesIn) downloaded &middot; @country.RemoteAddressCount addresses</div>
+                                    @if (countryPrograms.Count == 0)
+                                    {
+                                        <div class="sw-country-apps-muted">No program information for this traffic yet.</div>
+                                    }
+                                    else
+                                    {
+                                        <ul class="list-unstyled m-0">
+                                            @foreach (var countryProgram in countryPrograms)
+                                            {
+                                                <li class="d-flex justify-content-between gap-3">
+                                                    <span class="sw-truncate">@countryProgram.Name</span>
+                                                    <span class="text-nowrap" title="Uploaded and downloaded. While away: @Display.Bytes(countryProgram.AwayBytesSent) up, @Display.Bytes(countryProgram.AwayBytesReceived) down">&uarr; @Display.Bytes(countryProgram.BytesSent) &darr; @Display.Bytes(countryProgram.BytesReceived)</span>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+
+    <partial name="_PresenceCharts" model="Model.Timeline" />
+
+    <div class="card mb-4">
+        <div class="card-header">Programs</div>
+        <partial name="_ProgramTable" model="Model.Programs" />
+    </div>
+
+    <div class="card" id="destinations">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span>Destinations</span>
+            <span class="small">
+                @if (Model.IncludeLocalDestinations)
+                {
+                    <a asp-action="Index" asp-route-range="@Model.Range.Key" asp-fragment="destinations">Internet only</a>
+                }
+                else
+                {
+                    <a asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-local="true" asp-fragment="destinations">Include local network</a>
+                }
+            </span>
+        </div>
+        <div class="card-body py-2 small text-body-secondary">
+            The addresses programs sent data to, most first@(Model.IncludeLocalDestinations ? ", including devices on your own network" : ", not counting devices on your own network").
+            Names come from what the programs looked up; places are approximate.
+        </div>
+        <partial name="_DestinationTable" model="Model.Destinations" />
+    </div>
+</div>

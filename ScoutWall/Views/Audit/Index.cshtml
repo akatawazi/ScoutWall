@@ -1,0 +1,36 @@
+@model List<AuditEntry>
+@{
+    ViewData["Title"] = "Audit log";
+}
+<h1 class="h3 mb-3">Audit log</h1>
+<div class="card">
+    @if (Model.Count == 0)
+    {
+        <p class="text-body-secondary small m-0 p-3">Nothing recorded yet.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Target</th><th>Details</th></tr></thead>
+                <tbody>
+                    @foreach (var auditEntry in Model)
+                    {
+                        <tr>
+                            <td class="small text-nowrap">@Display.Time(auditEntry.OccurredAt)</td>
+                            <td class="small">@auditEntry.UserEmail</td>
+                            <td>@auditEntry.Action</td>
+                            <td class="sw-mono sw-truncate" title="@auditEntry.Target">@auditEntry.Target</td>
+                            <td class="small">
+                                @if (!string.IsNullOrEmpty(auditEntry.Details))
+                                {
+                                    <details><summary>View</summary><pre class="sw-details small mb-0">@auditEntry.Details</pre></details>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

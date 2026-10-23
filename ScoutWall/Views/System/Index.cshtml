@@ -1,0 +1,412 @@
+@model SystemReport
+@{
+    ViewData["Title"] = "System";
+    var latest = Model.Latest;
+    var memoryShare = latest == null || latest.MemoryTotalBytes == 0 ? 0 : (double)latest.MemoryUsedBytes / latest.MemoryTotalBytes;
+    var snapshotIsStale = Model.Snapshot.TakenAt < DateTime.UtcNow.AddMinutes(-5);
+    var programs = Model.Snapshot.Programs;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var blockedItems = Model.BlockedItems.ToList();
+}
+<div data-auto-refresh="60">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <div>
+            <h1 class="h3 m-0">System</h1>
+            <div class="text-body-secondary small">What is running on this computer, how hard it is working, and what Windows has reported.</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-link text-body-secondary" data-auto-refresh-toggle></button>
+            <partial name="_RangePicker" model="Model.Range" />
+        </div>
+    </div>
+
+    @if (programs.Count == 0)
+    {
+        <div class="alert alert-info">ScoutWall's sensor hasn't reported on this computer yet. It does within a minute of starting.</div>
+    }
+    else if (snapshotIsStale)
+    {
+        <div class="alert alert-warning">This information is from @Display.Time(Model.Snapshot.TakenAt). The sensor may have stopped.</div>
+    }
+
+    @if (!Model.LogHealth.ScheduledTaskLogOn)
+    {
+        <div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <span>Windows isn't keeping a history of scheduled tasks, which is how some unwanted programs restart themselves. Turn it on so ScoutWall notices new tasks?</span>
+            <form method="post" asp-action="EnableTaskLog"><button type="submit" class="btn btn-sm btn-primary">Turn it on</button></form>
+        </div>
+    }
+    @if (!Model.LogHealth.FailedSignInAuditingOn)
+    {
+        <div class="alert alert-info">
+            Windows isn't recording failed sign-ins, so ScoutWall can't warn you about password guessing. To turn it on, run
+            <code>auditpol /set /subcategory:"Logon" /failure:enable</code> in an administrator command prompt.
+        </div>
+    }
+    @if (Model.LogHealth.UnreadableChannels.Count > 0)
+    {
+        <div class="alert alert-warning small">ScoutWall couldn't read these Windows logs: @string.Join(", ", Model.LogHealth.UnreadableChannels).</div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="card sw-stat h-100">
+                <div class="sw-stat-label">Processor</div>
+                <div class="sw-stat-value">@(latest == null ? "-" : $"{latest.CpuPercent:0}%")</div>
+                <div class="sw-stat-detail">@Environment.ProcessorCount logical processors</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card sw-stat h-100">
+                <div class="sw-stat-label">Memory in use</div>
+                <div class="sw-stat-value">@(latest == null ? "-" : Display.Bytes(latest.MemoryUsedBytes))</div>
+                <div class="sw-stat-detail">@(latest == null ? "" : $"{Display.Percent(memoryShare)} of {Display.Bytes(latest.MemoryTotalBytes)}")</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card sw-stat h-100">
+                <div class="sw-stat-label">Programs running</div>
+                <div class="sw-stat-value">@programs.Count</div>
+                <div class="sw-stat-detail">@(latest?.ProcessCount ?? 0) processes</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card sw-stat h-100">
+                <div class="sw-stat-label">Services running</div>
+                <div class="sw-stat-value">@Model.RunningServiceCount</div>
+                <div class="sw-stat-detail">@(Model.NewServiceCount == 0 ? "No new services this week" : $"{Model.NewServiceCount} new this week")</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Processor use</div>
+                <div class="card-body">
+                    <div class="sw-chart"><canvas data-chart="cpu-timeline" aria-label="Processor use over time, in percent" role="img"></canvas></div>
+                    <script type="application/json" id="cpu-timeline">@Display.ChartData(Charts.ProcessorUse(Model.Timeline))</script>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Memory in use</div>
+                <div class="card-body">
+                    <div class="sw-chart"><canvas data-chart="memory-timeline" aria-label="Memory in use over time" role="img"></canvas></div>
+                    <script type="application/json" id="memory-timeline">@Display.ChartData(Charts.MemoryUse(Model.Timeline))</script>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Programs running now</span>
+            <span class="small text-body-secondary">Average and peak are over the selected time range</span>
+        </div>
+        @if (programs.Count == 0)
+        {
+            <p class="text-body-secondary small m-0 p-3">Nothing reported yet.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" data-sortable="running-programs">
+                    <thead>
+                        <tr>
+                            <th data-sort="text">Program</th>
+                            <th class="text-end" data-sort="number">Processor now</th>
+                            <th class="text-end" data-sort="number">Processor average</th>
+                            <th class="text-end" data-sort="number">Memory now</th>
+                            <th class="text-end" data-sort="number">Memory peak</th>
+                            <th class="text-end" data-sort="number">Copies</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var program in programs)
+                        {
+                            var usage = program.ProcessImageId is long id ? Model.UsageByProgram.GetValueOrDefault(id) : null;
+                            var programName = Model.NameOf(program);
+                            <tr>
+                                <td data-sort-value="@programName">
+                                    @if (program.ProcessImageId is long processImageId)
+                                    {
+                                        <a asp-controller="Programs" asp-action="Details" asp-route-id="@processImageId">@programName</a>
+                                    }
+                                    else
+                                    {
+                                        <span>@programName</span>
+                                    }
+                                    <div class="small text-body-secondary sw-truncate sw-mono" title="@program.ImagePath">@program.ImagePath</div>
+                                </td>
+                                <td class="text-end" data-sort-value="@program.CpuPercent.ToString(System.Globalization.CultureInfo.InvariantCulture)">@program.CpuPercent.ToString("0.0")%</td>
+                                <td class="text-end" data-sort-value="@((usage?.CpuPercentAverage ?? -1).ToString(System.Globalization.CultureInfo.InvariantCulture))">@(usage == null ? "-" : $"{usage.CpuPercentAverage:0.0}%")</td>
+                                <td class="text-end" data-sort-value="@program.MemoryBytes">@Display.Bytes(program.MemoryBytes)</td>
+                                <td class="text-end" data-sort-value="@(usage?.MemoryBytesPeak ?? -1)">@(usage == null ? "-" : Display.Bytes(usage.MemoryBytesPeak))</td>
+                                <td class="text-end" data-sort-value="@program.InstanceCount">@program.InstanceCount</td>
+                                <td class="text-end">
+                                    @{
+                                        var refusal = Model.RefusalFor(program);
+                                        var block = Model.BlockFor(program);
+                                    }
+                                    @if (block != null)
+                                    {
+                                        <form method="post" asp-controller="Responses" asp-action="Revoke" asp-route-id="@block.Id" class="d-inline"
+                                              data-confirm="Let @programName run again?">
+                                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                            <button type="submit" class="btn btn-sm sw-block-button sw-blocked" title="Blocked from running. Click to allow it again.">Blocked</button>
+                                        </form>
+                                    }
+                                    else if (refusal != null)
+                                    {
+                                        <span class="small text-body-secondary sw-no-block" title="@refusal">Protected</span>
+                                    }
+                                    else
+                                    {
+                                        <div class="d-inline-flex gap-1">
+                                            <form method="post" asp-controller="Responses" asp-action="Create"
+                                                  data-confirm="End @programName now (@program.InstanceCount running)? Unsaved work in it will be lost. It can start again later.">
+                                                <input type="hidden" name="actionType" value="@ResponseActionType.KillProgram" />
+                                                <input type="hidden" name="target" value="@program.ImagePath" />
+                                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                                <button type="submit" class="btn btn-sm sw-block-button" title="End every running copy of @programName">End</button>
+                                            </form>
+                                            @if (SystemReport.CanBlockFromRunning(program))
+                                            {
+                                            <form method="post" asp-controller="Responses" asp-action="Create"
+                                                  data-confirm="Block @programName from running? It is ended now and Windows will refuse to start it until you unblock it in the Blocked list on this page.">
+                                                <input type="hidden" name="actionType" value="@ResponseActionType.BlockExecution" />
+                                                <input type="hidden" name="target" value="@program.ImagePath" />
+                                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                                <button type="submit" class="btn btn-sm sw-block-button sw-danger" title="Stop @programName from running at all">Block</button>
+                                            </form>
+                                            }
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="small text-body-secondary px-3 py-2">Averages and peaks are kept for the busiest programs only. "-" means the program was never among them.</div>
+        }
+    </div>
+
+    <div class="card mb-4" id="scan">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span>Scan this computer</span>
+            <form method="post" asp-action="Scan">
+                <button type="submit" class="btn btn-sm btn-primary" @(Model.Scan.IsWaitingOrRunning ? "disabled" : "")>
+                    @(Model.Scan.IsWaitingOrRunning ? "Scanning…" : Model.Scan.FinishedAt == null ? "Scan now" : "Scan again")
+                </button>
+            </form>
+        </div>
+        <div class="card-body pb-2">
+            <p class="small mb-2">
+                Checks every running program, service, scheduled task and program that starts with Windows for warning signs, then
+                @(Model.ScanResults.Any(result => result.AssistantVerdict != null) || Model.Scan.AssistantReviewed ? "the assistant reviews what it found." : "lists what deserves a look.")
+                Nothing is changed until you press a button.
+            </p>
+            @if (Model.Scan.IsWaitingOrRunning)
+            {
+                <p class="small text-body-secondary mb-0">Scan in progress, started @Display.Time(Model.Scan.StartedAt ?? Model.Scan.RequestedAt). This page refreshes by itself.</p>
+            }
+            else if (Model.Scan.Error != null)
+            {
+                <p class="small text-danger mb-0">The last scan failed: @Model.Scan.Error</p>
+            }
+            else if (Model.Scan.FinishedAt != null)
+            {
+                <p class="small text-body-secondary mb-0">
+                    Last scan @Display.Time(Model.Scan.FinishedAt): @Model.Scan.ItemsChecked items checked,
+                    @(Model.Scan.ItemsFlagged == 0 ? "nothing needs your attention." : $"{Model.Scan.ItemsFlagged} worth a look.")
+                </p>
+            }
+        </div>
+        @if (Model.ScanResults.Count > 0)
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" data-sortable="scan-results">
+                    <thead>
+                        <tr>
+                            <th data-sort="text">Item</th>
+                            <th data-sort="text">Warning signs</th>
+                            <th data-sort="text">Recommendation</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var scanResult in Model.ScanResults)
+                        {
+                            <tr class="@(scanResult.Recommendation == ScanRecommendation.None ? "text-body-secondary" : "")">
+                                <td data-sort-value="@scanResult.Name">
+                                    <div class="small text-body-secondary">@scanResult.KindLabel</div>
+                                    <div class="sw-truncate" title="@scanResult.Name">@scanResult.Name</div>
+                                    <div class="small sw-mono sw-truncate" title="@(scanResult.Command ?? scanResult.ProgramPath)">@(scanResult.ProgramPath ?? scanResult.Command)</div>
+                                </td>
+                                <td class="small">@scanResult.Signals</td>
+                                <td class="small" data-sort-value="@((int)scanResult.Recommendation)">
+                                    <strong>@scanResult.RecommendationLabel</strong>
+                                    @if (scanResult.AssistantReason != null)
+                                    {
+                                        <div>@scanResult.AssistantReason</div>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-inline-flex flex-wrap justify-content-end gap-1">
+                                        @foreach (var (actionType, label, recommended) in Model.ActionsFor(scanResult))
+                                        {
+                                            <form method="post" asp-controller="Responses" asp-action="Create"
+                                                  data-confirm="@label: @scanResult.Name? You can undo this from the Blocked list on this page.">
+                                                <input type="hidden" name="actionType" value="@actionType" />
+                                                <input type="hidden" name="target" value="@SystemReport.TargetFor(scanResult, actionType)" />
+                                                <input type="hidden" name="durationMinutes" value="0" />
+                                                <input type="hidden" name="returnUrl" value="@(returnUrl + "#scan")" />
+                                                <button type="submit" class="btn btn-sm sw-block-button @(recommended ? "sw-danger sw-recommended" : "")">@label</button>
+                                            </form>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="card mb-4" id="blocked">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Blocked and disabled</span>
+            <a asp-controller="Responses" asp-action="Index" class="small">All blocks and history</a>
+        </div>
+        @if (blockedItems.Count == 0)
+        {
+            <p class="text-body-secondary small m-0 p-3">Nothing is blocked. Programs, scheduled tasks and services you block or disable show up here so you can undo it.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" data-sortable="blocked-items">
+                    <thead>
+                        <tr>
+                            <th data-sort="text">What</th>
+                            <th data-sort="text">Item</th>
+                            <th data-sort="number">Since</th>
+                            <th data-sort="text">By</th>
+                            <th class="text-end">Undo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var blockedItem in blockedItems)
+                        {
+                            <tr>
+                                <td class="small text-nowrap">@blockedItem.ActionLabel</td>
+                                <td class="small sw-mono sw-truncate" title="@blockedItem.Target">@blockedItem.Target</td>
+                                <td class="small text-nowrap" data-sort-value="@blockedItem.CreatedAt.Ticks">@Display.Time(blockedItem.CreatedAt)</td>
+                                <td class="small">@blockedItem.CreatedBy</td>
+                                <td class="text-end">
+                                    <form method="post" asp-controller="Responses" asp-action="Revoke" asp-route-id="@blockedItem.Id"
+                                          data-confirm="Undo &quot;@blockedItem.ActionLabel&quot; for @System.IO.Path.GetFileName(blockedItem.Target)?">
+                                        <input type="hidden" name="returnUrl" value="@(returnUrl + "#blocked")" />
+                                        <button type="submit" class="btn btn-sm sw-block-button">Unblock</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">What Windows reported</div>
+        @if (Model.Events.Count == 0)
+        {
+            <p class="text-body-secondary small m-0 p-3">Nothing notable in this time range: no new services or tasks, failed sign-ins, Defender detections, crashes or disk problems.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" data-sortable="system-events">
+                    <thead>
+                        <tr>
+                            <th data-sort="number">When</th>
+                            <th data-sort="text">Kind</th>
+                            <th data-sort="text">What happened</th>
+                            <th class="text-end" data-sort="number">Times</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var systemEvent in Model.Events)
+                        {
+                            <tr>
+                                <td class="small text-nowrap" data-sort-value="@systemEvent.OccurredAt.Ticks">@Display.Time(systemEvent.OccurredAt)</td>
+                                <td class="small" data-sort-value="@Display.EventCategory(systemEvent.Category)"><span class="sw-event-kind sw-event-@systemEvent.Category.ToString().ToLowerInvariant()">@Display.EventCategory(systemEvent.Category)</span></td>
+                                <td class="small">@systemEvent.Summary</td>
+                                <td class="text-end small" data-sort-value="@systemEvent.OccurrenceCount">@systemEvent.OccurrenceCount</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Services</span>
+            @if (Model.ShowAllServices)
+            {
+                <a asp-action="Index" asp-route-range="@Model.Range.Key" class="small">Show running and new only</a>
+            }
+            else
+            {
+                <a asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-allServices="true" class="small">Show all @Model.Services.Count</a>
+            }
+        </div>
+        @if (Model.Services.Count == 0)
+        {
+            <p class="text-body-secondary small m-0 p-3">The sensor lists services within five minutes of starting.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" data-sortable="services">
+                    <thead>
+                        <tr>
+                            <th data-sort="text">Service</th>
+                            <th data-sort="text">State</th>
+                            <th data-sort="text">Starts</th>
+                            <th data-sort="text">Runs as</th>
+                            <th data-sort="text">Program</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var service in Model.VisibleServices)
+                        {
+                            <tr>
+                                <td data-sort-value="@service.DisplayName">
+                                    @service.DisplayName
+                                    @if (service.IsNew)
+                                    {
+                                        <span class="badge bg-warning text-dark ms-1" title="First seen @service.FirstSeenAt.ToString("u")">New</span>
+                                    }
+                                    <div class="small text-body-secondary sw-mono">@service.ServiceName</div>
+                                </td>
+                                <td class="small">@service.State</td>
+                                <td class="small">@service.StartMode</td>
+                                <td class="small sw-truncate" title="@service.Account">@service.Account</td>
+                                <td class="small sw-mono sw-truncate" title="@service.BinaryPath">@service.BinaryPath</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

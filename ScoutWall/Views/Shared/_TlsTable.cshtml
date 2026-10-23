@@ -1,0 +1,30 @@
+@model List<TlsSession>
+@if (Model.Count == 0)
+{
+    <p class="text-body-secondary small m-0 p-3">No TLS connections recorded.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr><th>Server name</th><th>Client</th><th>Server</th><th>Program</th><th>Version</th><th>ALPN</th><th class="text-end">Count</th><th>Last seen</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var tlsSession in Model)
+                {
+                    <tr>
+                        <td class="sw-truncate" title="@tlsSession.ServerName">@tlsSession.ServerName</td>
+                        <td><a asp-controller="Addresses" asp-action="Details" asp-route-id="@tlsSession.ClientIp" class="sw-mono">@tlsSession.ClientIp</a></td>
+                        <td><a asp-controller="Addresses" asp-action="Details" asp-route-id="@tlsSession.ServerIp" class="sw-mono">@tlsSession.ServerIp</a><span class="small text-body-secondary">:@tlsSession.ServerPort</span></td>
+                        <td class="small">@(tlsSession.ProcessName ?? "-")</td>
+                        <td class="small">@tlsSession.TlsVersion</td>
+                        <td class="small">@tlsSession.ApplicationProtocols</td>
+                        <td class="text-end">@Display.Number(tlsSession.ConnectionCount)</td>
+                        <td class="small">@Display.Time(tlsSession.LastSeenAt)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

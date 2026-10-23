@@ -1,0 +1,46 @@
+@model FlowVerdict
+@{
+    ViewData["Title"] = "Flow verdict";
+}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+        <li class="breadcrumb-item"><a asp-action="Index">Flow analysis</a></li>
+        <li class="breadcrumb-item active" aria-current="page">#@Model.Id</li>
+    </ol>
+</nav>
+<h1 class="h4">
+    <span class="badge @Model.VerdictBadgeClass">@Model.Verdict</span>
+    from @Model.Provider@(Model.IsShadow ? " (shadow)" : "")
+</h1>
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <dl class="row small mb-0">
+                    <dt class="col-sm-4">Evaluated</dt><dd class="col-sm-8">@Display.Time(Model.EvaluatedAt)</dd>
+                    <dt class="col-sm-4">Flow</dt><dd class="col-sm-8">@Display.Direction(Model.Direction) @Model.Protocol/@Model.ServicePort</dd>
+                    <dt class="col-sm-4">Local</dt><dd class="col-sm-8 sw-mono">@Model.LocalIp</dd>
+                    <dt class="col-sm-4">Remote</dt><dd class="col-sm-8"><a asp-controller="Addresses" asp-action="Details" asp-route-id="@Model.RemoteIp" class="sw-mono">@Model.RemoteIp</a> @Model.Hostname</dd>
+                    <dt class="col-sm-4">Program</dt><dd class="col-sm-8 sw-mono text-break">@(Model.ProcessPath ?? "-")</dd>
+                    <dt class="col-sm-4">Score</dt><dd class="col-sm-8">@(Model.Score?.ToString() ?? "-")</dd>
+                    <dt class="col-sm-4">Confidence</dt><dd class="col-sm-8">@Model.Confidence.ToString("0.00")</dd>
+                    <dt class="col-sm-4">Template</dt><dd class="col-sm-8">@(Model.TemplateVersion ?? "-")</dd>
+                    <dt class="col-sm-4">State hash</dt><dd class="col-sm-8 sw-mono">@Model.StateHash</dd>
+                </dl>
+                <h2 class="h6 mt-3">Reasons</h2>
+                <ul class="small mb-0">
+                    @foreach (var reason in Model.Reasons.Split("; ", StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        <li>@reason</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">Features that were judged</div>
+            <div class="card-body"><pre class="sw-details small mb-0">@Model.FeaturesJson</pre></div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,72 @@
+@model SettingsOverview
+<form method="post" asp-action="SaveDetection">
+    <input type="hidden" name="revision" value="@(Model.RevisionOf<DetectionSettings>())" />
+    <input type="hidden" name="Detection.EnabledRules" value="" />
+    <div class="card mb-4">
+        <div class="card-header">Rules</div>
+        <div class="card-body">
+            @foreach (var (ruleName, description) in DetectionSettings.AllRules)
+            {
+                <div class="form-check form-switch mb-1">
+                    <input class="form-check-input" type="checkbox" id="rule-@ruleName" name="Detection.EnabledRules" value="@ruleName" checked="@Model.Detection.IsEnabled(ruleName)" />
+                    <label class="form-check-label" for="rule-@ruleName"><strong>@ruleName</strong> <span class="text-body-secondary small">@description</span></label>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Thresholds</div>
+        <div class="card-body row g-3">
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Detection.PortScanDistinctPorts">Port scan: distinct ports</label>
+                <input class="form-control" asp-for="Detection.PortScanDistinctPorts" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Detection.PortScanWindowSeconds">Port scan: within seconds</label>
+                <input class="form-control" asp-for="Detection.PortScanWindowSeconds" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Detection.SynFloodPerTenSeconds">SYN flood: attempts per 10 s</label>
+                <input class="form-control" asp-for="Detection.SynFloodPerTenSeconds" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Detection.HighVolumeMegabytesPerMinute">High volume: MB per minute</label>
+                <input class="form-control" asp-for="Detection.HighVolumeMegabytesPerMinute" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Detection.DnsQueriesPerMinute">DNS queries per minute</label>
+                <input class="form-control" asp-for="Detection.DnsQueriesPerMinute" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Detection.DataBleedMegabytesPerTenMinutes">Data bleed: MB per 10 min</label>
+                <input class="form-control" asp-for="Detection.DataBleedMegabytesPerTenMinutes" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Detection.IdleDataBleedMegabytesPerTenMinutes">Idle data bleed: MB per 10 min</label>
+                <input class="form-control" asp-for="Detection.IdleDataBleedMegabytesPerTenMinutes" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Detection.AlertAggregationMinutes">Group repeats within (minutes)</label>
+                <input class="form-control" asp-for="Detection.AlertAggregationMinutes" />
+            </div>
+            <div class="col-12">
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" asp-for="Detection.DecoyPortsEnabled" />
+                    <label class="form-check-label" asp-for="Detection.DecoyPortsEnabled">Open decoy ports to catch scanners (home and work networks only)</label>
+                </div>
+                <label class="form-label" asp-for="Detection.DecoyPortsText">Decoy ports (empty: ScoutWall picks five unused ones)</label>
+                <input class="form-control sw-mono mb-2" asp-for="Detection.DecoyPortsText" />
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" asp-for="Detection.BlockInternetScanners" />
+                    <label class="form-check-label" asp-for="Detection.BlockInternetScanners">Block internet addresses that scan this computer or touch a decoy port</label>
+                </div>
+                <label class="form-label" asp-for="Detection.ScannerBlockDays">Keep scanners blocked for (days)</label>
+                <input class="form-control mb-3" asp-for="Detection.ScannerBlockDays" />
+                <label class="form-label" asp-for="Detection.SensitivePortsText">Sensitive ports (comma separated)</label>
+                <input class="form-control sw-mono" asp-for="Detection.SensitivePortsText" />
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save detection settings</button>
+</form>

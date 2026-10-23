@@ -1,0 +1,28 @@
+@model List<ProcessTimelinePoint>
+@* Uploads and downloads as two charts, one above the other, so their very different sizes are not read as
+   comparable. Each heading prints its own total and busiest interval because the two value axes differ. *@
+@{
+    var totals = TrafficSplit.Sum(Model);
+    var uploadPeak = Model.Count == 0 ? 0 : Model.Max(point => point.BytesSent);
+    var downloadPeak = Model.Count == 0 ? 0 : Model.Max(point => point.BytesReceived);
+}
+<div class="card mb-4">
+    <div class="card-header d-flex flex-wrap justify-content-between gap-2">
+        <span>Uploaded over time</span>
+        <span class="small text-body-secondary">@Display.Bytes(totals.BytesSent) in total &middot; busiest interval @Display.Bytes(uploadPeak)</span>
+    </div>
+    <div class="card-body">
+        <div class="sw-chart"><canvas data-chart="upload-timeline" aria-label="Data uploaded over time, split by whether someone was at the computer" role="img"></canvas></div>
+        <script type="application/json" id="upload-timeline">@Display.ChartData(Charts.UploadTimeline(Model))</script>
+    </div>
+</div>
+<div class="card mb-4">
+    <div class="card-header d-flex flex-wrap justify-content-between gap-2">
+        <span>Downloaded over time</span>
+        <span class="small text-body-secondary">@Display.Bytes(totals.BytesReceived) in total &middot; busiest interval @Display.Bytes(downloadPeak)</span>
+    </div>
+    <div class="card-body">
+        <div class="sw-chart"><canvas data-chart="download-timeline" aria-label="Data downloaded over time, split by whether someone was at the computer" role="img"></canvas></div>
+        <script type="application/json" id="download-timeline">@Display.ChartData(Charts.DownloadTimeline(Model))</script>
+    </div>
+</div>

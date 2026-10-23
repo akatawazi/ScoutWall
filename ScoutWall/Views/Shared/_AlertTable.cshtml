@@ -1,0 +1,53 @@
+@model List<Alert>
+@if (Model.Count == 0)
+{
+    <p class="text-body-secondary small m-0 p-3">No alerts. Quiet is good.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Severity</th>
+                    <th>Alert</th>
+                    <th>Source</th>
+                    <th class="text-end">Count</th>
+                    <th>Last seen</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var alert in Model)
+                {
+                    <tr>
+                        <td><partial name="_Severity" model="alert.Severity" /></td>
+                        <td>
+                            <a asp-controller="Alerts" asp-action="Details" asp-route-id="@alert.Id">@alert.Title</a>
+                            <div class="small text-body-secondary">
+                                @alert.RuleName
+                                @if (alert.AnalystNote != null)
+                                {
+                                    <span title="@alert.AnalystNote"> &middot; reviewed by analyst</span>
+                                }
+                            </div>
+                        </td>
+                        <td>
+                            @if (alert.IsHostEvent)
+                            {
+                                <a asp-controller="System" asp-action="Index">This computer</a>
+                            }
+                            else
+                            {
+                                <a asp-controller="Addresses" asp-action="Details" asp-route-id="@alert.SourceIp" class="sw-mono">@alert.SourceIp</a>
+                            }
+                        </td>
+                        <td class="text-end">@Display.Number(alert.OccurrenceCount)</td>
+                        <td class="small">@Display.Time(alert.LastSeenAt)</td>
+                        <td><span class="badge @alert.StatusBadgeClass">@alert.Status</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

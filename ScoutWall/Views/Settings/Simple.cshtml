@@ -1,0 +1,58 @@
+@model SettingsOverview
+@{
+    ViewData["Title"] = "Settings";
+    var watched = Model.Capture.InterfaceNames.Count == 0
+        ? "Your internet connections (automatic)"
+        : string.Join(", ", Model.Interfaces.Where(item => Model.Capture.InterfaceNames.Contains(item.Name)).Select(item => item.DisplayName));
+    var protection = Model.Response.Mode switch
+    {
+        ResponseMode.Block => "Block threats automatically",
+        ResponseMode.Throttle => "Slow suspicious uploads down",
+        ResponseMode.BlockWhenIdle => "Block programs that send data while you're away",
+        _ => "Just tell me"
+    };
+    var notifications = new List<string>();
+    if (Model.Notification.DesktopEnabled) notifications.Add("on this computer");
+    if (Model.Notification.EmailEnabled) notifications.Add("by email");
+    if (Model.Notification.WebhookEnabled) notifications.Add("by webhook");
+}
+<div class="sw-home mx-auto">
+    <h1 class="h3 mb-1">Settings</h1>
+    <p class="text-body-secondary">You can also just ask: "email me when something serious happens" or "block that app".</p>
+
+    <div class="d-grid gap-3 mb-4">
+        <a class="card sw-choice text-decoration-none" asp-controller="Setup" asp-action="Watch" asp-route-fromSettings="1">
+            <div class="card-body">
+                <div class="small text-body-secondary">What ScoutWall watches</div>
+                <div class="fw-semibold">@watched</div>
+            </div>
+        </a>
+        <a class="card sw-choice text-decoration-none" asp-controller="Setup" asp-action="Protect" asp-route-fromSettings="1">
+            <div class="card-body">
+                <div class="small text-body-secondary">When something bad is found</div>
+                <div class="fw-semibold">@protection@(Model.Response.DryRun && Model.Response.Mode != ResponseMode.WatchAndAlert ? " (practice mode)" : "")</div>
+                <div class="small text-body-secondary">Blocks happen: @Model.Enforcement.ProviderDisplayName</div>
+            </div>
+        </a>
+        <a class="card sw-choice text-decoration-none" asp-controller="Setup" asp-action="Assistant" asp-route-fromSettings="1">
+            <div class="card-body">
+                <div class="small text-body-secondary">Your assistant</div>
+                <div class="fw-semibold">@(Model.Analyst.IsReady ? Model.Analyst.ProviderDisplayName : "None yet")</div>
+            </div>
+        </a>
+        <a class="card sw-choice text-decoration-none" asp-controller="Settings" asp-action="Index" asp-route-tab="notifications">
+            <div class="card-body">
+                <div class="small text-body-secondary">How you're told</div>
+                <div class="fw-semibold">@(notifications.Count == 0 ? "Only on this page" : "Notifications " + string.Join(", ", notifications))</div>
+            </div>
+        </a>
+        <a class="card sw-choice text-decoration-none" asp-controller="Settings" asp-action="Index" asp-route-tab="users">
+            <div class="card-body">
+                <div class="small text-body-secondary">People who can sign in</div>
+                <div class="fw-semibold">@Model.Users.Count @(Model.Users.Count == 1 ? "person" : "people")</div>
+            </div>
+        </a>
+    </div>
+
+    <a class="small" asp-controller="Settings" asp-action="Index">All settings (advanced)</a>
+</div>

@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="ScoutWall.Data/ScoutWall.Data.csproj" />
+  <Project Path="ScoutWall.Intelligence/ScoutWall.Intelligence.csproj" />
+  <Project Path="ScoutWall.Presence/ScoutWall.Presence.csproj" />
+  <Project Path="ScoutWall.Sensor/ScoutWall.Sensor.csproj" />
+  <Project Path="ScoutWall/ScoutWall.csproj" />
+</Solution>

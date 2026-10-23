@@ -1,0 +1,80 @@
+@model SettingsOverview
+<form method="post" asp-action="SaveCapture">
+    <input type="hidden" name="revision" value="@(Model.RevisionOf<CaptureSettings>())" />
+    <div class="card mb-4">
+        <div class="card-header">Interfaces to monitor</div>
+        <div class="card-body">
+            @if (Model.Interfaces.Count == 0)
+            {
+                <p class="text-body-secondary small">The sensor has not reported any interfaces yet. Start the sensor and reload this page.</p>
+            }
+            else
+            {
+                <p class="small text-body-secondary">Select the interfaces to capture. Leave all unchecked to capture on every active, non-loopback interface. Live capture requires <a href="https://npcap.com" rel="noreferrer">Npcap</a>.</p>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead><tr><th style="width: 3rem">Monitor</th><th>Interface</th><th>Addresses</th><th>State</th></tr></thead>
+                        <tbody>
+                            @foreach (var captureInterface in Model.Interfaces)
+                            {
+                                var checkboxId = "interface-" + captureInterface.Name.GetHashCode();
+                                <tr>
+                                    <td>
+                                        <input class="form-check-input" type="checkbox" id="@checkboxId" name="Capture.InterfaceNames" value="@captureInterface.Name"
+                                               checked="@Model.Capture.InterfaceNames.Contains(captureInterface.Name)" />
+                                    </td>
+                                    <td>
+                                        <label for="@checkboxId" class="fw-semibold">@captureInterface.DisplayName</label>
+                                        <div class="small text-body-secondary">@captureInterface.Description</div>
+                                        <div class="small sw-mono text-body-secondary">@captureInterface.Name</div>
+                                    </td>
+                                    <td class="small sw-mono">@captureInterface.Addresses</td>
+                                    <td class="small">@(captureInterface.IsCapturing ? "Capturing" : "")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            <div class="form-check form-switch">
+                <input class="form-check-input" asp-for="Capture.Promiscuous" />
+                <label class="form-check-label" asp-for="Capture.Promiscuous">Promiscuous mode (also see traffic between other devices on a mirrored or hub port)</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Capture options</div>
+        <div class="card-body row g-3">
+            <div class="col-lg-6">
+                <label class="form-label" asp-for="Capture.CaptureFilter">Capture filter (BPF syntax, optional)</label>
+                <input class="form-control sw-mono" asp-for="Capture.CaptureFilter" placeholder="not port 3389" />
+                <div class="form-text">Applied in the capture driver, before anything reaches ScoutWall.</div>
+            </div>
+            <div class="col-lg-6">
+                <label class="form-label" asp-for="Capture.LocalNetworksText">Local networks (one CIDR per line)</label>
+                <textarea class="form-control sw-mono" asp-for="Capture.LocalNetworksText" rows="4"></textarea>
+                <div class="form-text">Decides what counts as incoming or outgoing. Interface subnets are always included.</div>
+            </div>
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" asp-for="Capture.TrackProcesses" />
+                    <label class="form-check-label" asp-for="Capture.TrackProcesses">Track traffic per program (needed for data bleed; sensor must run as administrator)</label>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" asp-for="Capture.WritePacketFiles" />
+                    <label class="form-check-label" asp-for="Capture.WritePacketFiles">Keep a rolling set of packet capture files (needed for decryption and forensics)</label>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Capture.PacketFileSizeMegabytes">File size (MB)</label>
+                <input class="form-control" asp-for="Capture.PacketFileSizeMegabytes" />
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Capture.PacketFileCount">Files to keep</label>
+                <input class="form-control" asp-for="Capture.PacketFileCount" />
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save capture settings</button>
+</form>

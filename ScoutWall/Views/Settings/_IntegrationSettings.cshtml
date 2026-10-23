@@ -1,0 +1,70 @@
+@model SettingsOverview
+<form method="post" asp-action="SaveIntegration">
+    <input type="hidden" name="revision" value="@(Model.RevisionOf<IntegrationSettings>())" />
+    <div class="card mb-4">
+        <div class="card-header">Location and ISP lookup</div>
+        <div class="card-body row g-3">
+            <p class="small text-body-secondary mb-0">
+                For accurate offline lookups, download the free MaxMind GeoLite2 City and ASN databases (account required) and enter their paths.
+                The ip-api.com fallback works without setup but is for non-commercial use only and sends addresses over plain HTTP.
+            </p>
+            <div class="col-md-6">
+                <label class="form-label" asp-for="Integration.GeoIpCityDatabasePath">GeoLite2-City.mmdb path</label>
+                <input class="form-control sw-mono" asp-for="Integration.GeoIpCityDatabasePath" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" asp-for="Integration.GeoIpAsnDatabasePath">GeoLite2-ASN.mmdb path</label>
+                <input class="form-control sw-mono" asp-for="Integration.GeoIpAsnDatabasePath" />
+            </div>
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" asp-for="Integration.UseIpApiFallback" />
+                    <label class="form-check-label" asp-for="Integration.UseIpApiFallback">Use ip-api.com when the databases cannot answer</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Threat blocklists</div>
+        <div class="card-body row g-3">
+            <div class="col-lg-6">
+                <label class="form-label" asp-for="Integration.BlocklistUrlsText">Feed URLs (one per line)</label>
+                <textarea class="form-control sw-mono" asp-for="Integration.BlocklistUrlsText" rows="4"></textarea>
+            </div>
+            <div class="col-lg-6">
+                <label class="form-label" asp-for="Integration.StaticBlocklistText">Your own list (addresses or ranges, one per line)</label>
+                <textarea class="form-control sw-mono" asp-for="Integration.StaticBlocklistText" rows="4"></textarea>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <label class="form-label" asp-for="Integration.BlocklistRefreshHours">Refresh every (hours)</label>
+                <input class="form-control" asp-for="Integration.BlocklistRefreshHours" />
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">TLS decryption</div>
+        <div class="card-body row g-3">
+            <p class="small text-body-secondary mb-0">
+                Set the system environment variable <code>SSLKEYLOGFILE</code> to the key log path below and restart the browsers to inspect.
+                Install <a href="https://www.wireshark.org" rel="noreferrer">Wireshark</a> for tshark. Keep the key log file private: anyone with it can decrypt those sessions.
+            </p>
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" asp-for="Integration.DecryptionEnabled" />
+                    <label class="form-check-label" asp-for="Integration.DecryptionEnabled">Decrypt captured TLS traffic using the key log</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" asp-for="Integration.TsharkPath">tshark.exe path</label>
+                <input class="form-control sw-mono" asp-for="Integration.TsharkPath" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" asp-for="Integration.KeyLogFilePath">TLS key log file</label>
+                <input class="form-control sw-mono" asp-for="Integration.KeyLogFilePath" placeholder="C:\ProgramData\ScoutWall\tls-keys.log" />
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save integration settings</button>
+</form>

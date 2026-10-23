@@ -1,0 +1,907 @@
+/* ScoutWall follows the Blue Shift Technologies design language: Havelock Blue and Blue Marguerite on deep navy,
+   Inter for headings, Assistant for text, large rounded cards. Chart series colours are validated for colour-vision
+   deficiency in both themes; status colours are reserved for alert state and always appear with an icon and a label. */
+@font-face {
+    font-family: "Inter";
+    src: url("../lib/fonts/Inter-latin.woff2") format("woff2");
+    font-weight: 300 700;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Assistant";
+    src: url("../lib/fonts/Assistant-latin.woff2") format("woff2");
+    font-weight: 300 700;
+    font-display: swap;
+}
+
+:root,
+[data-bs-theme="light"] {
+    --bs-blue-havelock: #4293d5;
+    --sw-navy: #0f1d2e;
+    --sw-navy-deep: #06050a;
+    --sw-surface: #ffffff;
+    --sw-page: #f2f2f2;
+    --sw-text-primary: #06050a;
+    --sw-text-secondary: #505053;
+    --sw-grid: rgba(6, 5, 10, 0.10);
+    --sw-accent: #745ec7;
+    --sw-series-0: #9aa4ae;
+    --sw-series-1: #4293d5;
+    --sw-series-2: #5c4b9f;
+    --sw-series-3: #1baf7a;
+    --sw-status-good: #0ca30c;
+    --sw-status-warning: #fab219;
+    --sw-status-serious: #ec835a;
+    --sw-status-critical: #d03b3b;
+    --sw-radius-large: 32px;
+    --sw-radius-medium: 24px;
+    --sw-radius-small: 12px;
+
+    --bs-primary: #4293d5;
+    --bs-primary-rgb: 66, 147, 213;
+    --bs-link-color: #3475aa;
+    --bs-link-color-rgb: 52, 117, 170;
+    --bs-link-hover-color: #1a3a55;
+    --bs-link-hover-color-rgb: 26, 58, 85;
+    --bs-body-font-family: "Assistant", "Segoe UI", system-ui, sans-serif;
+    --bs-body-font-size: 1.0625rem;
+    --bs-border-radius: 12px;
+    --bs-border-radius-lg: 24px;
+    --bs-border-color: rgba(6, 5, 10, 0.12);
+}
+
+[data-bs-theme="dark"] {
+    --sw-surface: #132c3f;
+    --sw-page: #0b1622;
+    --sw-text-primary: #f2f2f2;
+    --sw-text-secondary: #b4b4b5;
+    --sw-grid: rgba(255, 255, 255, 0.10);
+    --sw-series-0: #6c7782;
+    --sw-series-1: #4b9bda;
+    --sw-series-2: #9666ee;
+    --sw-series-3: #199e70;
+    --bs-body-bg: #0b1622;
+    --bs-body-color: #f2f2f2;
+    --bs-link-color: #7ab3e1;
+    --bs-link-color-rgb: 122, 179, 225;
+    --bs-link-hover-color: #d9e9f6;
+    --bs-border-color: rgba(255, 255, 255, 0.14);
+}
+
+body {
+    background: var(--sw-page);
+    color: var(--sw-text-primary);
+    font-family: var(--bs-body-font-family);
+}
+
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6, .navbar-brand, .sw-stat-value {
+    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+}
+
+/* Header in the Blue Shift navy, as on blueshifttechnologies.com */
+.sw-navbar {
+    background: var(--sw-navy);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.sw-navbar .navbar-brand,
+.sw-navbar .nav-link {
+    color: #f2f2f2;
+}
+
+.sw-navbar .nav-link:hover,
+.sw-navbar .nav-link.active {
+    color: #7ab3e1;
+}
+
+.sw-navbar .navbar-toggler {
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.sw-navbar .navbar-toggler-icon {
+    filter: invert(1);
+}
+
+.sw-navbar .btn-outline-secondary {
+    color: #f2f2f2;
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.sw-navbar .btn-outline-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.sw-navbar .text-body-secondary {
+    color: #b4b4b5 !important;
+}
+
+/* Buttons: blue gradient primary and outlined secondary */
+.btn {
+    border-radius: 8px;
+    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    font-weight: 500;
+}
+
+.btn-primary {
+    --bs-btn-bg: #4293d5;
+    --bs-btn-border-color: #4293d5;
+    --bs-btn-hover-bg: #3475aa;
+    --bs-btn-hover-border-color: #3475aa;
+    --bs-btn-active-bg: #1a3a55;
+    --bs-btn-active-border-color: #1a3a55;
+    --bs-btn-disabled-bg: #7ab3e1;
+    --bs-btn-disabled-border-color: #7ab3e1;
+    background-image: linear-gradient(180deg, #7ab3e1 0%, #4293d5 100%);
+    border: 0;
+}
+
+.btn-primary:hover {
+    background-image: linear-gradient(180deg, #4293d5 0%, #3475aa 100%);
+}
+
+.btn-outline-primary {
+    --bs-btn-color: #3475aa;
+    --bs-btn-border-color: #4293d5;
+    --bs-btn-hover-bg: #4293d5;
+    --bs-btn-hover-border-color: #4293d5;
+}
+
+.form-control,
+.form-select {
+    border-radius: 10px;
+}
+
+.card {
+    background: var(--sw-surface);
+    border: 2px solid var(--sw-grid);
+    border-radius: var(--sw-radius-medium);
+    overflow: hidden;
+}
+
+.card-header {
+    background: transparent;
+    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    font-weight: 500;
+    border-bottom-color: var(--sw-grid);
+}
+
+.alert {
+    border-radius: var(--sw-radius-small);
+}
+
+.dropdown-menu {
+    border-radius: var(--sw-radius-small);
+}
+
+/* Hero blocks use the deep navy band from the company site */
+.card.sw-hero,
+.sw-hero {
+    background: radial-gradient(120% 140% at 0% 0%, #1a3a55 0%, var(--sw-navy) 55%, var(--sw-navy-deep) 100%);
+    color: #f2f2f2;
+    border: 0;
+    border-radius: var(--sw-radius-large);
+}
+
+.alert-info {
+    --bs-alert-bg: #ecf4fa;
+    --bs-alert-border-color: #d9e9f6;
+    --bs-alert-color: #1a3a55;
+}
+
+[data-bs-theme="dark"] .alert-info {
+    --bs-alert-bg: #132c3f;
+    --bs-alert-border-color: #1a3a55;
+    --bs-alert-color: #d9e9f6;
+}
+
+.sw-hero .text-body-secondary {
+    color: #b4b4b5 !important;
+}
+
+.sw-brand-mark {
+    width: 2rem;
+    height: 2rem;
+    margin-right: 0.35rem;
+    vertical-align: middle;
+}
+
+/* Plain-language pages */
+.sw-home,
+.sw-setup {
+    max-width: 52rem;
+}
+
+.sw-setup {
+    max-width: 44rem;
+}
+
+.sw-status-card {
+    border-width: 0;
+    border-left: 8px solid transparent !important;
+}
+
+.sw-status-card h1 {
+    font-weight: 400;
+    font-size: 2rem;
+}
+
+.sw-status-icon {
+    flex: 0 0 auto;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.sw-status-green { border-left-color: var(--sw-status-good) !important; }
+.sw-status-green .sw-status-icon { background: var(--sw-status-good); }
+.sw-status-amber { border-left-color: var(--sw-status-warning) !important; }
+.sw-status-amber .sw-status-icon { background: var(--sw-status-warning); color: #0b0b0b; }
+.sw-status-red { border-left-color: var(--sw-status-critical) !important; }
+.sw-status-red .sw-status-icon { background: var(--sw-status-critical); }
+.sw-status-grey { border-left-color: var(--sw-text-secondary) !important; }
+.sw-status-grey .sw-status-icon { background: var(--sw-text-secondary); }
+
+.sw-choice {
+    cursor: pointer;
+    color: inherit;
+    transition: border-color 0.15s ease;
+}
+
+.sw-choice:hover,
+.sw-choice:has(input:checked) {
+    border-color: var(--sw-series-1);
+}
+
+.sw-setup-step {
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    background: var(--sw-page);
+    color: var(--sw-text-secondary);
+}
+
+.sw-setup-step-current {
+    background: linear-gradient(180deg, #7ab3e1 0%, #4293d5 100%);
+    color: #ffffff;
+}
+
+.sw-setup-step-done {
+    color: var(--sw-status-good);
+}
+
+.sw-chat-message {
+    display: flex;
+    margin-bottom: 0.75rem;
+}
+
+.sw-chat-user {
+    justify-content: flex-end;
+}
+
+.sw-chat-bubble {
+    max-width: 85%;
+    padding: 0.6rem 0.9rem;
+    border-radius: 1rem;
+    white-space: pre-wrap;
+    background: var(--sw-surface);
+    border: 1px solid var(--sw-grid);
+}
+
+.sw-chat-user .sw-chat-bubble {
+    background: linear-gradient(180deg, #4293d5 0%, #3475aa 100%);
+    border-color: #3475aa;
+    color: #ffffff;
+}
+
+.sw-chat-bubble {
+    border-radius: 18px;
+}
+
+.sw-change-card {
+    border-left: 4px solid var(--sw-series-1);
+    max-width: 85%;
+}
+
+.card {
+    background: var(--sw-surface);
+    border-color: var(--sw-grid);
+}
+
+.card-header {
+    background: transparent;
+    font-weight: 600;
+}
+
+.sw-stat {
+    padding: 1rem 1.25rem;
+}
+
+.sw-stat-label {
+    font-size: 0.8rem;
+    color: var(--sw-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.sw-stat-value {
+    font-size: 1.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+
+.sw-stat-detail {
+    font-size: 0.85rem;
+    color: var(--sw-text-secondary);
+}
+
+.sw-chart {
+    position: relative;
+    height: 280px;
+}
+
+.sw-chart-short {
+    height: 220px;
+}
+
+.table {
+    --bs-table-bg: transparent;
+    font-variant-numeric: tabular-nums;
+}
+
+.table td,
+.table th {
+    vertical-align: middle;
+}
+
+.table td.text-end,
+.table th.text-end,
+.table th {
+    white-space: nowrap;
+}
+
+.sw-mono {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.875em;
+}
+
+.sw-truncate {
+    max-width: 22rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sw-severity {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+}
+
+.sw-severity-dot {
+    font-size: 0.8em;
+}
+
+.sw-severity-critical .sw-severity-dot { color: var(--sw-status-critical); }
+.sw-severity-high .sw-severity-dot { color: var(--sw-status-serious); }
+.sw-severity-medium .sw-severity-dot { color: var(--sw-status-warning); }
+.sw-severity-low .sw-severity-dot { color: var(--sw-text-secondary); }
+
+.sw-status-online { color: var(--sw-status-good); }
+.sw-status-offline { color: var(--sw-status-critical); }
+
+.sw-bar-track {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--sw-grid);
+    overflow: hidden;
+}
+
+.sw-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--sw-series-2);
+}
+
+.sw-range .btn {
+    min-width: 3.5rem;
+}
+
+pre.sw-details {
+    max-height: 20rem;
+    overflow: auto;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    background: var(--sw-page);
+}
+
+/* Data Flow: world map and sortable tables */
+.sw-world-map {
+    position: relative;
+}
+
+.sw-world-map svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1000 / 520;
+}
+
+/* The basemap is a black silhouette; it is faded on light pages and turned white on dark ones. */
+.sw-map-land {
+    opacity: 0.13;
+}
+
+[data-bs-theme="dark"] .sw-map-land {
+    filter: invert(1);
+    opacity: 0.16;
+}
+
+.sw-map-dot {
+    fill: var(--sw-series-1);
+    fill-opacity: 0.78;
+    stroke: var(--sw-surface);
+    stroke-width: 1.5;
+    transition: fill-opacity 0.15s;
+}
+
+.sw-world-map a:hover .sw-map-dot,
+.sw-world-map a:focus .sw-map-dot {
+    fill-opacity: 1;
+    stroke: var(--sw-text-primary);
+}
+
+.sw-world-map a:focus {
+    outline: none;
+}
+
+.sw-map-tooltip {
+    position: absolute;
+    z-index: 2;
+    max-width: 18rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: var(--sw-radius-small);
+    background: var(--sw-navy);
+    color: #fff;
+    font-size: 0.8rem;
+    pointer-events: none;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.sw-map-empty {
+    position: absolute;
+    inset: auto 0 45% 0;
+    text-align: center;
+}
+
+.sw-country-list > li + li {
+    margin-top: 0.7rem;
+}
+
+/* Hovering or focusing a country shows the programs that talked to it. */
+.sw-country {
+    position: relative;
+    border-radius: 6px;
+    outline-offset: 3px;
+    cursor: default;
+}
+
+.sw-country-apps {
+    display: none;
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    padding: 0.5rem 0.7rem;
+    border-radius: var(--sw-radius-small);
+    background: var(--sw-navy);
+    color: #fff;
+    font-size: 0.8rem;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.sw-country:hover .sw-country-apps,
+.sw-country:focus .sw-country-apps {
+    display: block;
+}
+
+.sw-country-apps-title,
+.sw-country-apps-muted {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.sw-country-apps-title {
+    margin-bottom: 0.3rem;
+}
+
+.sw-country-apps li + li {
+    margin-top: 0.15rem;
+}
+
+.sw-country-list .sw-bar-fill {
+    background: var(--sw-series-1);
+}
+
+.sw-sort-button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+    white-space: nowrap;
+}
+
+.sw-sort-button::after {
+    content: "\2195";
+    margin-left: 0.3rem;
+    opacity: 0.35;
+    font-size: 0.8em;
+}
+
+th[aria-sort="ascending"] .sw-sort-button::after {
+    content: "\2191";
+    opacity: 0.9;
+}
+
+th[aria-sort="descending"] .sw-sort-button::after {
+    content: "\2193";
+    opacity: 0.9;
+}
+
+.sw-block-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.1rem 0.55rem;
+    border: 1px solid var(--sw-grid);
+    border-radius: 999px;
+    color: var(--sw-text-secondary);
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.sw-block-button:hover,
+.sw-block-button:focus-visible {
+    border-color: var(--sw-status-critical);
+    color: var(--sw-status-critical);
+}
+
+.sw-block-button.sw-blocked {
+    border-color: var(--sw-status-critical);
+    background: var(--sw-status-critical);
+    color: #fff;
+}
+
+.sw-block-button.sw-blocked:hover {
+    background: transparent;
+    color: var(--sw-status-critical);
+}
+
+.sw-block-button.sw-allow:hover,
+.sw-block-button.sw-allow:focus-visible {
+    border-color: var(--sw-status-good);
+    color: var(--sw-status-good);
+}
+
+.sw-block-button.sw-allowed {
+    border-color: var(--sw-status-good);
+    color: var(--sw-status-good);
+}
+
+.sw-block-button.sw-static {
+    cursor: default;
+}
+
+.sw-block-button.sw-allowed:not(.sw-static):hover {
+    border-color: var(--sw-grid);
+    color: var(--sw-text-secondary);
+}
+
+.sw-program-actions {
+    justify-content: flex-end;
+}
+
+.sw-no-block {
+    white-space: nowrap;
+    cursor: help;
+}
+
+.sw-program-name {
+    min-width: 0;
+}
+
+/* On narrow screens the Block button sits under the program name instead of off to the right. */
+@media (max-width: 767.98px) {
+    .sw-program-cell {
+        flex-wrap: wrap;
+    }
+
+    .sw-program-cell > form,
+    .sw-program-cell > .sw-block-button.sw-allow:hover,
+.sw-block-button.sw-allow:focus-visible {
+    border-color: var(--sw-status-good);
+    color: var(--sw-status-good);
+}
+
+.sw-block-button.sw-allowed {
+    border-color: var(--sw-status-good);
+    color: var(--sw-status-good);
+}
+
+.sw-block-button.sw-allowed:hover {
+    border-color: var(--sw-grid);
+    color: var(--sw-text-secondary);
+}
+
+.sw-program-actions {
+    justify-content: flex-end;
+}
+
+.sw-no-block {
+        margin-left: 0 !important;
+    }
+}
+
+/* System page: event kinds carry a coloured edge plus their name, never colour alone. */
+.sw-event-kind {
+    display: inline-block;
+    padding-left: 0.45rem;
+    border-left: 3px solid var(--sw-grid);
+    white-space: nowrap;
+}
+
+.sw-event-security,
+.sw-event-defender {
+    border-left-color: var(--sw-status-critical);
+}
+
+.sw-event-account,
+.sw-event-service,
+.sw-event-scheduledtask {
+    border-left-color: var(--sw-status-warning);
+}
+
+.sw-event-disk,
+.sw-event-stability {
+    border-left-color: var(--sw-status-serious);
+}
+
+/* Task and service actions on alerts and findings. */
+.sw-host-target {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem 0.75rem;
+    padding: 0.35rem 0;
+    border-top: 1px solid var(--sw-grid);
+}
+
+.sw-host-target:first-child {
+    border-top: 0;
+}
+
+.sw-host-target-name {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.sw-block-button.sw-danger:hover,
+.sw-block-button.sw-danger:focus-visible {
+    border-color: var(--sw-status-critical);
+    background: var(--sw-status-critical);
+    color: #fff;
+}
+
+/* Alerts tab: a coloured edge per severity, plus the severity label, never colour alone. */
+.sw-alert-row {
+    border-left: 4px solid transparent;
+}
+
+.sw-alert-row.sw-severity-critical {
+    border-left-color: var(--sw-status-critical);
+}
+
+.sw-alert-row.sw-severity-high {
+    border-left-color: var(--sw-status-serious);
+}
+
+.sw-alert-row.sw-severity-medium {
+    border-left-color: var(--sw-status-warning);
+}
+
+.sw-group-badge {
+    background: var(--sw-grid);
+    color: var(--sw-text-primary);
+    font-weight: 500;
+}
+
+.sw-count-badge {
+    background: var(--sw-status-critical);
+    color: #fff;
+}
+
+.sw-alert-groups .nav-link {
+    border-radius: 999px;
+}
+
+.sw-block-button.sw-recommended {
+    border-color: var(--sw-status-critical);
+    color: var(--sw-status-critical);
+    font-weight: 600;
+}
+
+/* The full ScoutWall logo has its own dark background, so it sits on dark surfaces with rounded corners. */
+.sw-logo {
+    display: block;
+    width: 100%;
+    max-width: 30rem;
+    height: auto;
+    margin-left: auto;
+    margin-right: auto;
+    border-radius: var(--sw-radius-small);
+}
+
+/* Two-letter country code in front of a destination's place, so rows can be scanned by country. */
+.sw-country-code {
+    display: inline-block;
+    min-width: 1.75rem;
+    margin-right: 0.25rem;
+    padding: 0 0.25rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-align: center;
+    color: var(--bs-secondary-color);
+}
+
+.sw-destination-cell {
+    max-width: 24rem;
+}
+
+.sw-destination-place {
+    min-width: 13rem;
+}
+
+/* A heading over a pair of columns (Uploaded: while here / while away). */
+.sw-group-head {
+    text-align: center;
+    border-bottom-color: var(--bs-border-color);
+    font-weight: 600;
+}
+
+thead tr + tr th {
+    font-size: 0.85em;
+    font-weight: 500;
+    color: var(--sw-text-secondary);
+}
+
+/* Pages use the full window width, so on large screens long names get more room before they are shortened. */
+@media (min-width: 2200px) {
+    .sw-truncate {
+        max-width: 32rem;
+    }
+
+    .sw-destination-cell {
+        max-width: 36rem;
+    }
+}
+
+/* The away table has two long-text columns side by side, so each gets less room. */
+.sw-away-table .sw-truncate {
+    max-width: 18rem;
+}
+
+/* Presence strip: here / away / couldn't tell / not recorded across the chosen time range. Colours match the
+   upload and download charts (here = series 1, away = series 2, unknown = series 0). */
+.sw-presence-strip {
+    position: relative;
+    height: 1.75rem;
+    border-radius: var(--sw-radius-small, 6px);
+    overflow: hidden;
+    background: var(--sw-grid);
+}
+
+.sw-presence-segment {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    min-width: 1px;
+}
+
+.sw-presence-segment:hover,
+.sw-presence-segment:focus {
+    outline: 2px solid var(--sw-text-primary);
+    outline-offset: -2px;
+    z-index: 1;
+}
+
+.sw-presence-here { background: var(--sw-series-1); }
+.sw-presence-away { background: var(--sw-series-2); }
+.sw-presence-unknown { background: var(--sw-series-0); }
+.sw-presence-none {
+    background: repeating-linear-gradient(45deg, transparent 0 4px, var(--bs-border-color) 4px 6px);
+}
+
+.sw-presence-key {
+    display: inline-block;
+    width: 0.8rem;
+    height: 0.8rem;
+    margin-right: 0.35rem;
+    border-radius: 3px;
+    vertical-align: -0.1rem;
+}
+
+.sw-away-bytes {
+    font-weight: 600;
+}
+
+.sw-away-periods > li + li {
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.sw-away-periods summary {
+    cursor: pointer;
+}
+
+/* I/O page: file change kinds carry a word as well as a colour. */
+.sw-change {
+    display: inline-block;
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+
+.sw-change-created { color: var(--sw-series-3); }
+.sw-change-modified { color: var(--sw-series-1); }
+.sw-change-deleted { color: var(--sw-status-critical); }
+.sw-change-renamed { color: var(--sw-series-2); }
+
+.sw-badge-important {
+    background: transparent;
+    border: 1px solid var(--sw-series-2);
+    color: var(--sw-series-2);
+    font-weight: 600;
+}
+
+.sw-row-warning > td {
+    background: color-mix(in srgb, var(--sw-status-critical) 8%, transparent);
+}
+
+.sw-bar-fill.sw-bar-low {
+    background: var(--sw-status-critical);
+}
+
+.sw-change-read { color: var(--sw-text-secondary); }
+
+/* Where a file lives: a quiet label, with the owner's own files emphasised. */
+.sw-area {
+    display: inline-block;
+    padding: 0 0.4rem;
+    border-radius: 4px;
+    border: 1px solid var(--bs-border-color);
+    color: var(--sw-text-secondary);
+}
+
+.sw-area-myfiles {
+    border-color: var(--sw-series-1);
+    color: var(--sw-series-1);
+    font-weight: 600;
+}

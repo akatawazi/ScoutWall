@@ -1,0 +1,67 @@
+@model List<AnalystAssessment>
+@{
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+}
+@if (Model.Count == 0)
+{
+    <p class="text-body-secondary small m-0 p-3">Nothing needs your attention. The analyst reviews everything the detectors flag and only lists what matters here.</p>
+}
+else
+{
+    <ul class="list-group list-group-flush">
+        @foreach (var assessment in Model)
+        {
+            <li class="list-group-item">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                    <div class="flex-grow-1" style="min-width: 16rem">
+                        <span class="badge @assessment.VerdictBadgeClass me-1">@(assessment.ProposesSuppression && assessment.Verdict == AnalystVerdict.Benign ? "Proposal" : assessment.VerdictLabel)</span>
+                        <strong>@assessment.Title</strong>
+                        <div class="small mt-1">@assessment.Explanation</div>
+                        @if (!string.IsNullOrEmpty(assessment.RecommendedAction))
+                        {
+                            <div class="small mt-1"><strong>Recommended:</strong> @assessment.RecommendedAction</div>
+                        }
+                        @if (assessment.FloorNote != null)
+                        {
+                            <div class="small text-body-secondary mt-1">@assessment.FloorNote</div>
+                        }
+                        @if (assessment.HostActionTargets.Count > 0)
+                        {
+                            <div class="mt-2">
+                                <partial name="_HostActions" model="new HostActionPanel(assessment.HostActionTargets, true, returnUrl)" />
+                            </div>
+                        }
+                        <div class="small text-body-secondary mt-1">
+                            @Display.Time(assessment.CreatedAt) &middot; confidence @Display.Percent(assessment.Confidence)
+                            @if (assessment.ProcessPath != null)
+                            {
+                                <span> &middot; <span class="sw-mono">@System.IO.Path.GetFileName(assessment.ProcessPath)</span></span>
+                            }
+                            @if (assessment.RemoteIp != null)
+                            {
+                                <span> &middot; <a asp-controller="Addresses" asp-action="Details" asp-route-id="@assessment.RemoteIp" class="sw-mono">@assessment.RemoteIp</a></span>
+                            }
+                            @if (assessment.AlertId.HasValue)
+                            {
+                                <span> &middot; <a asp-controller="Alerts" asp-action="Details" asp-route-id="@assessment.AlertId">alert</a></span>
+                            }
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        @if (assessment.ProposesSuppression)
+                        {
+                            <form method="post" asp-controller="Analyst" asp-action="ConfirmSuppression" asp-route-id="@assessment.Id"
+                                  data-confirm="Stop alerting on @assessment.RuleName from @assessment.RemoteIp?">
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Confirm suppression</button>
+                            </form>
+                        }
+                        <form method="post" asp-controller="Analyst" asp-action="Acknowledge" asp-route-id="@assessment.Id">
+                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Done</button>
+                        </form>
+                    </div>
+                </div>
+            </li>
+        }
+    </ul>
+}

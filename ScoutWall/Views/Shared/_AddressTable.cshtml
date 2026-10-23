@@ -1,0 +1,52 @@
+@model List<AddressSummary>
+@if (Model.Count == 0)
+{
+    <p class="text-body-secondary small m-0 p-3">No traffic in this time range.</p>
+}
+else
+{
+    var maximumBytes = Math.Max(1, Model.Max(summary => summary.TotalBytes));
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Address</th>
+                    <th>Location</th>
+                    <th>ISP / network</th>
+                    <th class="text-end">In</th>
+                    <th class="text-end">Out</th>
+                    <th class="text-end">Connections</th>
+                    <th style="width: 8rem"><span class="visually-hidden">Share</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var addressSummary in Model)
+                {
+                    <tr>
+                        <td>
+                            <a asp-controller="Addresses" asp-action="Details" asp-route-id="@addressSummary.IpAddress" class="sw-mono">@addressSummary.IpAddress</a>
+                            @if (addressSummary.Profile?.IsBlocklisted == true)
+                            {
+                                <span class="badge bg-danger ms-1" title="@addressSummary.Profile.BlocklistSource">Blocklisted</span>
+                            }
+                            @if (addressSummary.Hostname != null)
+                            {
+                                <div class="small text-body-secondary sw-truncate" title="@addressSummary.Hostname">@addressSummary.Hostname</div>
+                            }
+                        </td>
+                        <td class="small">@(addressSummary.Profile?.LocationDisplay ?? "Looking up…")</td>
+                        <td class="small sw-truncate" title="@addressSummary.Profile?.IspDisplay">@(addressSummary.Profile?.IspDisplay ?? "")</td>
+                        <td class="text-end">@Display.Bytes(addressSummary.BytesIn)</td>
+                        <td class="text-end">@Display.Bytes(addressSummary.BytesOut)</td>
+                        <td class="text-end">@Display.Number(addressSummary.ConnectionCount)</td>
+                        <td>
+                            <div class="sw-bar-track" title="@Display.Bytes(addressSummary.TotalBytes)">
+                                <div class="sw-bar-fill" style="width: @(addressSummary.TotalBytes * 100 / maximumBytes)%; background: var(--sw-series-1)"></div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

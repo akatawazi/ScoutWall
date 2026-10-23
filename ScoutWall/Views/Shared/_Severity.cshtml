@@ -1,0 +1,4 @@
+@model AlertSeverity
+<span class="sw-severity sw-severity-@Model.ToString().ToLowerInvariant()">
+    <span class="sw-severity-dot" aria-hidden="true">@Display.SeverityIcon(Model)</span>@Model
+</span>

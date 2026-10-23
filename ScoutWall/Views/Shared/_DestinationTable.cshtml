@@ -1,0 +1,130 @@
+@model List<DestinationSummary>
+@{
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    // On a program's own page every row is that program, so the top-program column is left out.
+    var forProgram = ViewData["ForProgram"] is true;
+}
+@if (Model.Count == 0)
+{
+    <p class="text-body-secondary small m-0 p-3">
+        No destinations in this time range. Destinations come from per-program tracking, which needs the sensor to run as administrator.
+    </p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" data-sortable="destinations">
+            <thead>
+                <tr>
+                    <th rowspan="2" data-sort="text" data-sort-column="0">Destination</th>
+                    <th rowspan="2" data-sort="text" data-sort-column="1">Location</th>
+                    <th rowspan="2" data-sort="text" data-sort-column="2">Network</th>
+                    <th colspan="2" class="sw-group-head">Uploaded</th>
+                    <th colspan="2" class="sw-group-head">Downloaded</th>
+                    <th rowspan="2" style="width: 7rem" data-sort="number" data-sort-column="7" title="Part of the upload that happened while nobody was at the computer">Away share</th>
+                    @if (!forProgram)
+                    {
+                        <th rowspan="2" data-sort="text" data-sort-column="8">Top program</th>
+                    }
+                </tr>
+                <tr>
+                    <th class="text-end" data-sort="number" data-sort-column="3">While here</th>
+                    <th class="text-end" data-sort="number" data-sort-column="4">While away</th>
+                    <th class="text-end" data-sort="number" data-sort-column="5">While here</th>
+                    <th class="text-end" data-sort="number" data-sort-column="6">While away</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var destination in Model)
+                {
+                    var destinationName = destination.Hostname ?? destination.IpAddress;
+                    <tr>
+                        <td data-sort-value="@destinationName" class="sw-destination-cell">
+                            <div class="d-flex align-items-start gap-2 sw-program-cell">
+                                <div class="sw-program-name">
+                                    @if (destination.Hostname != null)
+                                    {
+                                        <div class="sw-truncate" title="@destination.Hostname">
+                                            @destination.Hostname
+                                            @if (destination.OtherNameCount > 0)
+                                            {
+                                                <span class="small text-body-secondary" title="Other names were seen for this address, so several sites may share it">+@destination.OtherNameCount</span>
+                                            }
+                                        </div>
+                                    }
+                                    <a asp-controller="Addresses" asp-action="Details" asp-route-id="@destination.IpAddress" class="small sw-mono">@destination.IpAddress</a>
+                                    @if (destination.Profile?.IsBlocklisted == true)
+                                    {
+                                        <span class="badge bg-danger ms-1" title="@destination.Profile.BlocklistSource">Blocklisted</span>
+                                    }
+                                </div>
+                                <div class="ms-auto d-flex flex-wrap gap-1 sw-program-actions">
+                                    @if (destination.ActiveBlockId is long blockId)
+                                    {
+                                        <form method="post" asp-controller="Responses" asp-action="Revoke" asp-route-id="@blockId"
+                                              data-confirm="Let this computer reach @destinationName again?">
+                                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                            <button type="submit" class="btn btn-sm sw-block-button sw-blocked" title="Blocked. Click to unblock.">
+                                                <svg aria-hidden="true" viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.75" /><path d="M3.6 3.6l8.8 8.8" stroke="currentColor" stroke-width="1.75" /></svg>
+                                                Blocked
+                                            </button>
+                                        </form>
+                                    }
+                                    else if (destination.BlockRefusal == null)
+                                    {
+                                        <form method="post" asp-controller="Responses" asp-action="Create"
+                                              data-confirm="Block @destination.IpAddress (@destinationName) until you unblock it? Big services share addresses, so other sites on the same address may stop working too. You can undo this here or on the Blocks page.">
+                                            <input type="hidden" name="actionType" value="@ResponseActionType.BlockAddress" />
+                                            <input type="hidden" name="target" value="@destination.IpAddress" />
+                                            <input type="hidden" name="durationMinutes" value="0" />
+                                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                            <button type="submit" class="btn btn-sm sw-block-button" title="Block all traffic with @destination.IpAddress">
+                                                <svg aria-hidden="true" viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.75" /><path d="M3.6 3.6l8.8 8.8" stroke="currentColor" stroke-width="1.75" /></svg>
+                                                Block
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <span class="small text-body-secondary sw-no-block" title="@destination.BlockRefusal">Can't block</span>
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                        <td class="small sw-destination-place" title="@destination.CoordinatesDisplay">
+                            @if (destination.Profile?.CountryCode is { Length: 2 } countryCode)
+                            {
+                                <span class="sw-country-code" aria-hidden="true">@countryCode</span>
+                            }
+                            @destination.LocationDisplay
+                        </td>
+                        <td class="small" title="@destination.Profile?.AutonomousSystemDisplay">
+                            <div class="sw-truncate" style="max-width: 12rem">@(destination.Profile?.IspDisplay ?? "")</div>
+                        </td>
+                        <partial name="_PresenceBytes" model="(destination.HereBytesSent, destination.AwayBytesSent, destination.UnknownBytesSent)" />
+                        <partial name="_PresenceBytes" model="(destination.HereBytesReceived, destination.AwayBytesReceived, destination.UnknownBytesReceived)" />
+                        <td data-sort-value="@destination.AwayShare.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                            <div class="sw-bar-track" title="@Display.Percent(destination.AwayShare) of the upload here happened while nobody was at the computer">
+                                <div class="sw-bar-fill" style="width: @((int)(destination.AwayShare * 100))%"></div>
+                            </div>
+                            <div class="small text-body-secondary">@Display.Percent(destination.AwayShare)</div>
+                        </td>
+                        @if (!forProgram)
+                        {
+                            <td class="small" data-sort-value="@(destination.TopProgram?.DisplayName ?? "")">
+                                @if (destination.TopProgram != null)
+                                {
+                                    <a asp-controller="Programs" asp-action="Details" asp-route-id="@destination.TopProgram.Id" class="sw-truncate d-inline-block" style="max-width: 12rem" title="@destination.TopProgram.ImagePath">@destination.TopProgram.DisplayName</a>
+                                }
+                                @if (destination.ProgramCount > 1)
+                                {
+                                    <div class="text-body-secondary">+@(destination.ProgramCount - 1) more</div>
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

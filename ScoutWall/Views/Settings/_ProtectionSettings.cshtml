@@ -1,0 +1,34 @@
+@model SettingsOverview
+@{
+    var enforcement = Model.Enforcement;
+}
+<form method="post" asp-action="SaveEnforcement">
+    <input type="hidden" name="revision" value="@(Model.RevisionOf<EnforcementSettings>())" />
+    <div class="card mb-4">
+        <div class="card-header">Where blocks and throttles are carried out</div>
+        <div class="card-body row g-3">
+            <div class="col-md-6">
+                <label class="form-label" asp-for="Enforcement.Provider">Enforcement point</label>
+                <select class="form-select" asp-for="Enforcement.Provider">
+                    <option value="@EnforcementProvider.MonitorOnly">Nothing (monitor only)</option>
+                    <option value="@EnforcementProvider.WindowsFirewall">Windows Defender Firewall on this computer</option>
+                    <option value="@EnforcementProvider.Webhook">Router or firewall webhook</option>
+                </select>
+                <div class="form-text">When this changes, ScoutWall removes its rules from the old enforcement point and re-applies active blocks on the new one.</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" asp-for="Enforcement.WebhookUrl">Webhook address</label>
+                <input class="form-control sw-mono" asp-for="Enforcement.WebhookUrl" placeholder="https://firewall.local/scoutwall" />
+                <label class="form-label mt-2" for="webhook-secret">Shared secret</label>
+                <input class="form-control sw-mono" type="password" id="webhook-secret" name="Enforcement.WebhookSecret" autocomplete="off"
+                       placeholder="@(enforcement.HasWebhookSecret ? "Saved. Leave blank to keep it" : "")" />
+                <div class="form-text">
+                    Requests are JSON (<code>event</code> apply/remove, <code>id</code>, <code>type</code>, <code>target</code>, <code>expires_at</code>, <code>nonce</code>) with headers
+                    <code>X-ScoutWall-Timestamp</code> and <code>X-ScoutWall-Signature: sha256=HMAC(secret, timestamp + "." + body)</code>. Answer with any 2xx status.
+                    Webhooks can block and throttle addresses; program blocks need Windows Firewall.
+                </div>
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save enforcement settings</button>
+</form>

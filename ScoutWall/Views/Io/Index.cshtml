@@ -1,0 +1,517 @@
+@model IoReport
+@{
+    ViewData["Title"] = "I/O";
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var busiest = Model.BusiestDiskNow;
+    var disks = Model.Timeline.GroupBy(point => point.DiskNumber).OrderBy(group => group.Key).ToList();
+    var filterPrograms = Model.Programs.Where(program => program.FilesCreated + program.FilesDeleted + program.FilesRenamed > 0).ToList();
+    string KindClass(FileChangeKind kind) => kind switch
+    {
+        FileChangeKind.Created => "sw-change-created",
+        FileChangeKind.Deleted => "sw-change-deleted",
+        FileChangeKind.Renamed => "sw-change-renamed",
+        FileChangeKind.Read => "sw-change-read",
+        _ => "sw-change-modified"
+    };
+    var scope = Model.Filter.Scope;
+    var scopeName = scope switch { FileScope.Mine => "your files", FileScope.System => "system files", _ => "all files" };
+    var readAudit = Model.ReadAudit;
+    var tracking = Model.Tracking;
+    var readStatus = !tracking.ReadTrackingEnabled
+        ? (readAudit.Applied ? "Switching off…" : "Off")
+        : !readAudit.Applied
+            ? (readAudit.LastError != null ? "Couldn't switch on" : "Switching on…")
+            : !readAudit.PolicyOn ? "Switched off by Windows policy" : "On";
+}
+<div data-auto-refresh="60">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <div>
+            <h1 class="h3 m-0">I/O</h1>
+            <div class="text-body-secondary small">How hard the drives are working, which programs read and write the most, and which files changed.</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-link text-body-secondary" data-auto-refresh-toggle></button>
+            <partial name="_RangePicker" model="Model.Range" />
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <span class="small text-body-secondary">Files to show:</span>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Which files to show">
+            <a class="btn @(scope == FileScope.Mine ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-scope="@FileScope.Mine"
+               title="Your own files: Documents, Desktop, Downloads, Pictures and other personal folders">My files</a>
+            <a class="btn @(scope == FileScope.System ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-scope="@FileScope.System"
+               title="Windows, Program Files, app data and everything else">System files</a>
+            <a class="btn @(scope == FileScope.All ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-scope="@FileScope.All">All</a>
+        </div>
+        <span class="small text-body-secondary">Applies to the file counts, programs, folders and changed files below.</span>
+    </div>
+
+    @foreach (var alert in Model.FileAlerts)
+    {
+        <div class="alert alert-danger d-flex flex-wrap justify-content-between align-items-center gap-2" role="alert">
+            <div>
+                <strong>@alert.Title</strong>
+                <div class="small">@alert.Description</div>
+            </div>
+            <a class="btn btn-sm btn-light" asp-controller="Alerts" asp-action="Details" asp-route-id="@alert.Id">What to do</a>
+        </div>
+    }
+
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3">
+            <div class="card sw-stat h-100">
+                <div class="sw-stat-label">Reading now</div>
+                <div class="sw-stat-value">@Display.Bytes(Model.ReadBytesPerSecondNow)/s</div>
+                <div class="sw-stat-detail">All drives, last minute</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card sw-stat h-100">
+                <div class="sw-stat-label">Writing now</div>
+                <div class="sw-stat-value">@Display.Bytes(Model.WriteBytesPerSecondNow)/s</div>
+                <div class="sw-stat-detail">All drives, last minute</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card sw-stat h-100">
+                <div class="sw-stat-label">Busiest drive</div>
+                <div class="sw-stat-value">@(busiest == null ? "-" : $"{busiest.BusyPercent:0}%")</div>
+                <div class="sw-stat-detail">@(busiest?.DisplayName ?? "No drive readings yet")</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card sw-stat h-100">
+                <div class="sw-stat-label">Changes to @scopeName</div>
+                <div class="sw-stat-value">@Display.Number(Model.FileTotals.Total)</div>
+                <div class="sw-stat-detail">
+                    @Display.Number(Model.FileTotals.Created) created &middot; @Display.Number(Model.FileTotals.Deleted) deleted &middot; @Display.Number(Model.FileTotals.Renamed) renamed
+                    @if (Model.FileTotals.Read > 0)
+                    {
+                        <span>&middot; @Display.Number(Model.FileTotals.Read) read</span>
+                    }
+                    @if (Model.FileTotals.ExtensionChanges > 0)
+                    {
+                        <br /><strong>@Display.Number(Model.FileTotals.ExtensionChanges) renamed to a different extension</strong>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (Model.Space.Drives.Count > 0)
+    {
+        <div class="card mb-4">
+            <div class="card-header">Drive space</div>
+            <div class="card-body">
+                <div class="row g-3">
+                    @foreach (var drive in Model.Space.Drives)
+                    {
+                        <div class="col-sm-6 col-xl-3">
+                            <div class="d-flex justify-content-between small">
+                                <strong>@drive.DisplayName</strong>
+                                <span class="text-body-secondary">@drive.Format</span>
+                            </div>
+                            <div class="sw-bar-track my-1" title="@Display.Percent(1 - drive.FreeShare) used">
+                                <div class="sw-bar-fill @(drive.IsLow ? "sw-bar-low" : "")" style="width: @((int)Math.Round((1 - drive.FreeShare) * 100))%"></div>
+                            </div>
+                            <div class="small @(drive.IsLow ? "text-danger fw-semibold" : "text-body-secondary")">
+                                @Display.Bytes(drive.FreeBytes) free of @Display.Bytes(drive.TotalBytes)@(drive.IsLow ? " (running low)" : "")
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (!Model.HasDiskData)
+    {
+        <p class="text-body-secondary small">No drive readings in this period yet. The sensor records them every 30 seconds.</p>
+    }
+    <div class="row g-3 mb-4">
+        @foreach (var disk in disks)
+        {
+            var points = disk.ToList();
+            <div class="col-xl-6">
+                <div class="card h-100">
+                    <div class="card-header d-flex flex-wrap justify-content-between gap-2">
+                        <span>@points[0].DisplayName</span>
+                        <span class="small text-body-secondary">@Display.Bytes(points.Sum(point => point.ReadBytes)) read &middot; @Display.Bytes(points.Sum(point => point.WriteBytes)) written</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="sw-chart"><canvas data-chart="disk-@disk.Key" aria-label="Bytes read from and written to @points[0].DisplayName over time" role="img"></canvas></div>
+                        <script type="application/json" id="disk-@disk.Key">@Display.ChartData(Charts.DiskTimeline(points))</script>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Programs using the disk <span class="small text-body-secondary fw-normal">(file counts: @scopeName)</span></div>
+        <div class="card-body py-2 small text-body-secondary">
+            Read and written bytes are Windows' own count per program and include network and device I/O as well as files.
+            Created, deleted and renamed files are counted from the drives' change records.
+        </div>
+        @if (Model.Programs.Count == 0)
+        {
+            <p class="text-body-secondary small m-0 p-3">No program activity recorded in this period yet.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" data-sortable="io-programs">
+                    <thead>
+                        <tr>
+                            <th data-sort="text">Program</th>
+                            <th class="text-end" data-sort="number">Read</th>
+                            <th class="text-end" data-sort="number">Written</th>
+                            <th class="text-end" data-sort="number">Files created</th>
+                            <th class="text-end" data-sort="number">Files deleted</th>
+                            <th class="text-end" data-sort="number">Files renamed</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var program in Model.Programs)
+                        {
+                            <tr>
+                                <td data-sort-value="@program.Name">
+                                    <a asp-controller="Programs" asp-action="Details" asp-route-id="@program.ProcessImageId">@program.Name</a>
+                                    <div class="small text-body-secondary sw-truncate sw-mono" title="@program.ProcessImage?.ImagePath">@program.ProcessImage?.ImagePath</div>
+                                </td>
+                                <td class="text-end" data-sort-value="@program.ReadBytes">@Display.Bytes(program.ReadBytes)</td>
+                                <td class="text-end" data-sort-value="@program.WriteBytes">@Display.Bytes(program.WriteBytes)</td>
+                                <td class="text-end" data-sort-value="@program.FilesCreated">
+                                    @if (program.FilesCreated > 0)
+                                    {
+                                        <a asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-program="@program.ProcessImageId" asp-route-kind="@FileChangeKind.Created" asp-fragment="files">@Display.Number(program.FilesCreated)</a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-body-secondary">0</span>
+                                    }
+                                </td>
+                                <td class="text-end" data-sort-value="@program.FilesDeleted">
+                                    @if (program.FilesDeleted > 0)
+                                    {
+                                        <a asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-program="@program.ProcessImageId" asp-route-kind="@FileChangeKind.Deleted" asp-fragment="files">@Display.Number(program.FilesDeleted)</a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-body-secondary">0</span>
+                                    }
+                                </td>
+                                <td class="text-end" data-sort-value="@program.FilesRenamed">
+                                    @if (program.FilesRenamed > 0)
+                                    {
+                                        <a asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-program="@program.ProcessImageId" asp-route-kind="@FileChangeKind.Renamed" asp-fragment="files">@Display.Number(program.FilesRenamed)</a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-body-secondary">0</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-inline-flex flex-wrap justify-content-end gap-1">
+                                        @if (program.EndRefusal != null)
+                                        {
+                                            <span class="small text-body-secondary sw-no-block" title="@program.EndRefusal">Protected</span>
+                                        }
+                                        else
+                                        {
+                                            <form method="post" asp-controller="Responses" asp-action="Create"
+                                                  data-confirm="End @program.Name now? Unsaved work in it is lost.">
+                                                <input type="hidden" name="actionType" value="@ResponseActionType.KillProgram" />
+                                                <input type="hidden" name="target" value="@program.ProcessImage!.ImagePath" />
+                                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                                <button type="submit" class="btn btn-sm sw-block-button">End</button>
+                                            </form>
+                                            @if (program.BlockRefusal == null)
+                                            {
+                                                <form method="post" asp-controller="Responses" asp-action="Create"
+                                                      data-confirm="Block @program.Name from running at all? You can unblock it under System.">
+                                                    <input type="hidden" name="actionType" value="@ResponseActionType.BlockExecution" />
+                                                    <input type="hidden" name="target" value="@program.ProcessImage!.ImagePath" />
+                                                    <input type="hidden" name="durationMinutes" value="0" />
+                                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                                    <button type="submit" class="btn btn-sm sw-block-button sw-danger">Block</button>
+                                                </form>
+                                            }
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    @if (Model.BusiestFolders.Count > 0)
+    {
+        <div class="card mb-4">
+            <div class="card-header">Folders with the most changes <span class="small text-body-secondary fw-normal">(@scopeName)</span></div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" data-sortable="io-folders">
+                    <thead>
+                        <tr>
+                            <th data-sort="text">Folder</th>
+                            <th class="text-end" data-sort="number">Files</th>
+                            <th class="text-end" data-sort="number">Changes</th>
+                            <th class="text-end" data-sort="number">Last change</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var folder in Model.BusiestFolders)
+                        {
+                            <tr>
+                                <td data-sort-value="@folder.Folder">
+                                    <a class="sw-mono small" asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-text="@(folder.Folder + "\\")" asp-fragment="files" title="@folder.Folder">@Display.Truncate(folder.Folder, 110)</a>
+                                    @if (ImportantFolders.Contains(folder.Folder + "\\"))
+                                    {
+                                        <span class="badge sw-badge-important ms-1">Important</span>
+                                    }
+                                </td>
+                                <td class="text-end" data-sort-value="@folder.Files">@Display.Number(folder.Files)</td>
+                                <td class="text-end" data-sort-value="@folder.Changes">@Display.Number(folder.Changes)</td>
+                                <td class="text-end small" data-sort-value="@folder.LastChangedBucket">@Display.Time(DateTimeOffset.FromUnixTimeSeconds(folder.LastChangedBucket).UtcDateTime)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <div class="card mb-4" id="reads">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span>Who read your files</span>
+            <span class="small">Read tracking: <strong class="@(readStatus == "On" ? "" : "text-body-secondary")">@readStatus</strong></span>
+        </div>
+        <div class="card-body">
+            @if (!tracking.ReadTrackingEnabled)
+            {
+                <p class="small mb-2">
+                    Windows doesn't record which programs read your files unless asked. Turning this on makes three changes, all put back when you turn it off
+                    (or by the rescue tool):
+                </p>
+                <ul class="small mb-3">
+                    <li>switches on Windows <em>file system auditing</em> (successful access),</li>
+                    <li>marks your own folders (listed below) so reading a file inside them is recorded; folder listings are not,</li>
+                    <li>makes the Windows Security log bigger (512 MB), so these records don't push out sign-in and account events.</li>
+                </ul>
+                <form method="post" asp-action="ReadTracking"
+                      data-confirm="Turn on read tracking? ScoutWall will switch on Windows file auditing for your folders and enlarge the Security log. You can turn it off again here.">
+                    <input type="hidden" name="enable" value="true" />
+                    <input type="hidden" name="revision" value="@Model.TrackingRevision" />
+                    <button type="submit" class="btn btn-sm btn-primary">Turn on read tracking</button>
+                </form>
+            }
+            else
+            {
+                <p class="small mb-2">
+                    @if (readStatus == "On")
+                    {
+                        <span>Recording reads in @readAudit.AuditedFolders.Count folders since @Display.Time(readAudit.AppliedAt).</span>
+                    }
+                    else if (readStatus == "Switched off by Windows policy")
+                    {
+                        <span class="text-danger">Windows file auditing was switched off again, usually by a company Group Policy. Reads aren't being recorded.</span>
+                    }
+                    else if (readAudit.LastError != null)
+                    {
+                        <span class="text-danger">Couldn't switch on: @readAudit.LastError</span>
+                    }
+                    else
+                    {
+                        <span>The sensor applies the change within half a minute.</span>
+                    }
+                    Indexing, antivirus and sync programs read everything, so they are only counted:
+                    @(readAudit.BackgroundReadsToday.Count == 0 ? "none today." : string.Join(", ", readAudit.BackgroundReadsToday.OrderByDescending(pair => pair.Value).Select(pair => $"{pair.Key} {pair.Value:N0}")) + " reads today.")
+                </p>
+                <form method="post" asp-action="ReadTracking" class="mb-3"
+                      data-confirm="Turn off read tracking? ScoutWall puts the Windows audit settings back the way they were.">
+                    <input type="hidden" name="enable" value="false" />
+                    <input type="hidden" name="revision" value="@Model.TrackingRevision" />
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">Turn off read tracking</button>
+                </form>
+            }
+
+            @if (Model.Readers.Count > 0)
+            {
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm table-hover mb-0" data-sortable="io-readers">
+                        <thead>
+                            <tr>
+                                <th data-sort="text">Program</th>
+                                <th class="text-end" data-sort="number">Files read</th>
+                                <th class="text-end" data-sort="number">Read while you were away</th>
+                                <th class="text-end" data-sort="number">Uploaded while you were away</th>
+                                <th class="text-end" data-sort="number">Last read</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var reader in Model.Readers)
+                            {
+                                <tr class="@(reader.ReadAndUploadedWhileAway ? "sw-row-warning" : "")">
+                                    <td data-sort-value="@reader.Name">
+                                        <a asp-controller="Programs" asp-action="Details" asp-route-id="@reader.ProcessImageId">@reader.Name</a>
+                                        @if (reader.ReadAndUploadedWhileAway)
+                                        {
+                                            <div class="small text-danger fw-semibold">Read your files and sent data out while you were away</div>
+                                        }
+                                    </td>
+                                    <td class="text-end" data-sort-value="@reader.FilesRead">
+                                        <a asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-scope="@FileScope.Mine" asp-route-kind="@FileChangeKind.Read" asp-route-program="@reader.ProcessImageId" asp-fragment="files">@Display.Number(reader.FilesRead)</a>
+                                    </td>
+                                    <td class="text-end" data-sort-value="@reader.FilesReadWhileAway">@Display.Number(reader.FilesReadWhileAway)</td>
+                                    <td class="text-end" data-sort-value="@reader.UploadedWhileAwayBytes">@Display.Bytes(reader.UploadedWhileAwayBytes)</td>
+                                    <td class="text-end small" data-sort-value="@reader.LastReadBucket">@Display.Time(DateTimeOffset.FromUnixTimeSeconds(reader.LastReadBucket).UtcDateTime)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else if (tracking.ReadTrackingEnabled && readStatus == "On")
+            {
+                <p class="small text-body-secondary">No reads of your files recorded in this period yet.</p>
+            }
+
+            <details>
+                <summary class="small">Which folders count as your files</summary>
+                <div class="small mt-2">
+                    <div class="text-body-secondary mb-1">Found in Windows (including folders moved to OneDrive or another drive):</div>
+                    <ul class="sw-mono mb-2">
+                        @foreach (var folder in Model.AreaRules.PersonalFolders)
+                        {
+                            <li>@folder</li>
+                        }
+                        @if (Model.AreaRules.PersonalFolders.Count == 0)
+                        {
+                            <li class="text-body-secondary">Not read yet; the sensor finds them within a few minutes.</li>
+                        }
+                    </ul>
+                    <div class="text-body-secondary mb-2">
+                        Everything else in your user folder outside AppData counts as your files too, and so do drives other than @Model.AreaRules.SystemDrive.
+                        Reads are recorded in the folders above and the ones you add here.
+                    </div>
+                    <form method="post" asp-action="MyFolders">
+                        <input type="hidden" name="revision" value="@Model.TrackingRevision" />
+                        <label class="form-label small mb-1" for="my-folders">More folders, one per line (for example D:\Photos)</label>
+                        <textarea class="form-control form-control-sm sw-mono mb-2" id="my-folders" name="folders" rows="3">@tracking.ExtraMyFilesFoldersText</textarea>
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">Save folders</button>
+                    </form>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <div class="card" id="files">
+        <div class="card-header">Changed files <span class="small text-body-secondary fw-normal">(@scopeName)</span></div>
+        <div class="card-body pb-2">
+            <form method="get" asp-action="Index" asp-fragment="files" class="row g-2 align-items-end">
+                <input type="hidden" name="range" value="@Model.Range.Key" />
+                <input type="hidden" name="scope" value="@scope" />
+                <div class="col-md-4">
+                    <label class="form-label small mb-1" for="file-text">File or folder contains</label>
+                    <input class="form-control form-control-sm" id="file-text" name="text" value="@Model.Filter.Text" placeholder="e.g. Documents or .docx" />
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label small mb-1" for="file-kind">Change</label>
+                    <select class="form-select form-select-sm" id="file-kind" name="kind">
+                        <option value="">Any</option>
+                        @foreach (var kind in Enum.GetValues<FileChangeKind>())
+                        {
+                            <option value="@kind" selected="@(Model.Filter.Kind == kind)">@kind</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label small mb-1" for="file-program">Program</label>
+                    <select class="form-select form-select-sm" id="file-program" name="program">
+                        <option value="">Any</option>
+                        @foreach (var program in filterPrograms)
+                        {
+                            <option value="@program.ProcessImageId" selected="@(Model.Filter.ProcessImageId == program.ProcessImageId)">@program.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-check mb-1">
+                        <input class="form-check-input" type="checkbox" id="file-important" name="important" value="true" checked="@Model.Filter.ImportantOnly" />
+                        <label class="form-check-label small" for="file-important">Important folders only</label>
+                    </div>
+                </div>
+                <div class="col-md-1 d-grid">
+                    <button type="submit" class="btn btn-sm btn-primary">Show</button>
+                </div>
+            </form>
+            <p class="small text-body-secondary mt-2 mb-0">
+                Newest first@(Model.ChangesTruncated ? ", showing the latest 300; narrow the search to see others" : "").
+                The program is known for created, deleted, renamed and read files. Very busy cache and log folders are left out.
+            </p>
+        </div>
+        @if (Model.Changes.Count == 0)
+        {
+            <p class="text-body-secondary small m-0 p-3">No file changes match in this period. File tracking needs the sensor running as administrator.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" data-sortable="io-files">
+                    <thead>
+                        <tr>
+                            <th data-sort="number">When</th>
+                            <th data-sort="text">Change</th>
+                            <th data-sort="text">Area</th>
+                            <th data-sort="text">File</th>
+                            <th data-sort="text">Program</th>
+                            <th class="text-end" data-sort="number">Times</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var change in Model.Changes)
+                        {
+                            <tr class="@(change.ChangedExtension ? "sw-row-warning" : "")">
+                                <td class="small text-nowrap" data-sort-value="@change.BucketStart">@Display.Time(change.ChangedAt)</td>
+                                <td data-sort-value="@change.Kind"><span class="sw-change @KindClass(change.Kind)">@change.Kind</span></td>
+                                <td class="small text-nowrap" data-sort-value="@change.Area"><span class="sw-area sw-area-@change.Area.ToString().ToLowerInvariant()">@FileAreaRules.Label(change.Area)</span></td>
+                                <td data-sort-value="@change.Path">
+                                    <div class="sw-truncate" title="@change.Path">
+                                        @System.IO.Path.GetFileName(change.Path)
+                                        @if (change.IsImportant)
+                                        {
+                                            <span class="badge sw-badge-important ms-1">Important</span>
+                                        }
+                                    </div>
+                                    <div class="small text-body-secondary sw-mono sw-truncate" title="@change.Folder">@change.Folder</div>
+                                    @if (change.OldPath != null)
+                                    {
+                                        <div class="small @(change.ChangedExtension ? "text-danger fw-semibold" : "text-body-secondary")">
+                                            was @System.IO.Path.GetFileName(change.OldPath)@(change.ChangedExtension ? " (extension changed)" : "")
+                                        </div>
+                                    }
+                                </td>
+                                <td class="small" data-sort-value="@(change.ProcessImage?.DisplayName ?? "")">
+                                    @if (change.ProcessImage != null)
+                                    {
+                                        <a asp-controller="Programs" asp-action="Details" asp-route-id="@change.ProcessImage.Id" title="@change.ProcessImage.ImagePath">@change.ProcessImage.DisplayName</a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-body-secondary">@(change.Kind == FileChangeKind.Modified ? "Not tracked for edits" : "Unknown")</span>
+                                    }
+                                </td>
+                                <td class="text-end" data-sort-value="@change.ChangeCount">@change.ChangeCount</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

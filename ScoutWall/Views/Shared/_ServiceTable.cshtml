@@ -1,0 +1,35 @@
+@model List<ServiceSummary>
+@if (Model.Count == 0)
+{
+    <p class="text-body-secondary small m-0 p-3">No traffic in this time range.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>Direction</th>
+                    <th class="text-end">In</th>
+                    <th class="text-end">Out</th>
+                    <th class="text-end">Connections</th>
+                    <th class="text-end">Remote hosts</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var serviceSummary in Model)
+                {
+                    <tr>
+                        <td>@serviceSummary.ServiceName <span class="small text-body-secondary sw-mono">@serviceSummary.Protocol/@serviceSummary.ServicePort</span></td>
+                        <td class="small">@Display.Direction(serviceSummary.Direction)</td>
+                        <td class="text-end">@Display.Bytes(serviceSummary.BytesIn)</td>
+                        <td class="text-end">@Display.Bytes(serviceSummary.BytesOut)</td>
+                        <td class="text-end">@Display.Number(serviceSummary.ConnectionCount)</td>
+                        <td class="text-end">@Display.Number(serviceSummary.RemoteAddressCount)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

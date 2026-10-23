@@ -1,0 +1,49 @@
+@model SettingsOverview
+<div class="card mb-4">
+    <div class="card-header">Users</div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead><tr><th>Email</th><th>Last sign-in</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var user in Model.Users)
+                {
+                    <tr>
+                        <td>@user.Email</td>
+                        <td class="small">@Display.Time(user.LastLoginAt)</td>
+                        <td class="small">
+                            @(user.MustChangePassword ? "Must change password" : "Active")
+                            @(user.IsLockedOut(DateTime.UtcNow) ? " · locked" : "")
+                        </td>
+                        <td class="text-end">
+                            @if (user.Email != User.Identity?.Name)
+                            {
+                                <form method="post" asp-action="RemoveUser" asp-route-id="@user.Id" data-confirm="Remove @user.Email?">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Add a user</div>
+    <div class="card-body">
+        <form method="post" asp-action="CreateUser" class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label" for="new-email">Email</label>
+                <input class="form-control" type="email" id="new-email" name="email" required autocomplete="off" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label" for="new-password">Temporary password</label>
+                <input class="form-control" type="password" id="new-password" name="temporaryPassword" required minlength="@ScoutWall.Data.Models.User.MinimumPasswordLength" autocomplete="new-password" />
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Add</button>
+            </div>
+        </form>
+    </div>
+</div>

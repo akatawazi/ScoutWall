@@ -1,0 +1,204 @@
+@model DataBleedReport
+@{
+    var away = Model.Away;
+    var totals = Model.Totals;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    string StateClass(PresenceState? state) => state switch
+    {
+        PresenceState.Here => "sw-presence-here",
+        PresenceState.Away => "sw-presence-away",
+        PresenceState.Unknown => "sw-presence-unknown",
+        _ => "sw-presence-none"
+    };
+    string StateLabel(PresenceState? state) => state switch
+    {
+        PresenceState.Here => "Here",
+        PresenceState.Away => "Away",
+        PresenceState.Unknown => "Couldn't tell",
+        _ => "Not recorded (ScoutWall stopped or the computer was asleep)"
+    };
+}
+<div class="card mb-4" id="away">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span>While you were away</span>
+        <span class="small text-body-secondary">Times are in your local time zone</span>
+    </div>
+    <div class="card-body">
+        <p class="mb-3">
+            @if (away.HasHistory)
+            {
+                <span>You were away for <strong>@Display.Duration(away.AwayTime)</strong> of this period.</span>
+            }
+            Programs uploaded <strong>@Display.Bytes(totals.AwayBytesSent)</strong> and downloaded <strong>@Display.Bytes(totals.AwayBytesReceived)</strong> while you were away.
+            @if (away.HasHistory && away.UnknownTime > away.RecordedTime / 2)
+            {
+                <span class="text-body-secondary">For most of this period ScoutWall couldn't tell whether you were here. Run the presence agent in your Windows session so it can.</span>
+            }
+        </p>
+
+        @if (away.HasHistory)
+        {
+            <div class="sw-presence-strip" role="img" aria-label="When you were at the computer and when you were away. The list below has the same away times.">
+                @foreach (var segment in away.Segments)
+                {
+                    <span class="sw-presence-segment @StateClass(segment.State)"
+                          style="left: @segment.LeftPercent.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)%; width: @segment.WidthPercent.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)%"
+                          data-presence-label="@StateLabel(segment.State)" data-start="@Display.IsoTime(segment.Start)" data-end="@Display.IsoTime(segment.End)"
+                          data-duration="@Display.Duration(segment.Duration)"></span>
+                }
+            </div>
+            <div class="d-flex justify-content-between small text-body-secondary mt-1">
+                <span>@Display.Time(away.Since)</span>
+                <span>now</span>
+            </div>
+            <div class="d-flex flex-wrap gap-3 small text-body-secondary mt-2 mb-3">
+                <span><span class="sw-presence-key sw-presence-here"></span>Here</span>
+                <span><span class="sw-presence-key sw-presence-away"></span>Away</span>
+                <span><span class="sw-presence-key sw-presence-unknown"></span>Couldn't tell</span>
+                <span><span class="sw-presence-key sw-presence-none"></span>Not recorded</span>
+            </div>
+        }
+        else
+        {
+            <p class="small text-body-secondary">
+                Presence history starts once this version of ScoutWall is running; the figures above come from the here/away mark on each minute of traffic.
+            </p>
+        }
+    </div>
+
+    <h2 class="h6 px-3 mb-2">Where data went while you were away <span class="small fw-normal text-body-secondary">(internet destinations)</span></h2>
+    @if (away.Pairs.Count == 0)
+    {
+        <p class="small text-body-secondary px-3">Nothing was sent while you were away in this period.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 sw-away-table" data-sortable="away-pairs">
+                <thead>
+                    <tr>
+                        <th data-sort="text">Program</th>
+                        <th data-sort="text">Sent to</th>
+                        <th data-sort="text">Location</th>
+                        <th class="text-end" data-sort="number">Uploaded while away</th>
+                        <th class="text-end" data-sort="number">Downloaded while away</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var pair in away.Pairs)
+                    {
+                        var destinationName = pair.Destination.Hostname ?? pair.Destination.IpAddress;
+                        <tr>
+                            <td data-sort-value="@pair.Program.Name">
+                                <a asp-controller="Programs" asp-action="Details" asp-route-id="@pair.Program.ProcessImageId">@pair.Program.Name</a>
+                                <div class="small text-body-secondary sw-truncate sw-mono" title="@pair.Program.ProcessImage?.ImagePath">@pair.Program.ProcessImage?.ImagePath</div>
+                            </td>
+                            <td data-sort-value="@destinationName">
+                                @if (pair.Destination.Hostname != null)
+                                {
+                                    <div class="sw-truncate" title="@pair.Destination.Hostname">@pair.Destination.Hostname</div>
+                                }
+                                <a asp-controller="Addresses" asp-action="Details" asp-route-id="@pair.Destination.IpAddress" class="small sw-mono">@pair.Destination.IpAddress</a>
+                                @if (pair.Destination.Profile?.IsBlocklisted == true)
+                                {
+                                    <span class="badge bg-danger ms-1" title="@pair.Destination.Profile.BlocklistSource">Blocklisted</span>
+                                }
+                            </td>
+                            <td class="small" title="@pair.Destination.CoordinatesDisplay">
+                                @if (pair.Destination.Profile?.CountryCode is { Length: 2 } countryCode)
+                                {
+                                    <span class="sw-country-code" aria-hidden="true">@countryCode</span>
+                                }
+                                @pair.Destination.LocationDisplay
+                                <div class="text-body-secondary sw-truncate">@pair.Destination.Profile?.IspDisplay</div>
+                            </td>
+                            <td class="text-end sw-away-bytes" data-sort-value="@pair.BytesSent">@Display.Bytes(pair.BytesSent)</td>
+                            <td class="text-end" data-sort-value="@pair.BytesReceived">@Display.Bytes(pair.BytesReceived)</td>
+                            <td class="text-end">
+                                <div class="d-inline-flex flex-wrap justify-content-end gap-1">
+                                    @if (pair.Program.ActiveBlockId != null)
+                                    {
+                                        <span class="small text-body-secondary">Program blocked</span>
+                                    }
+                                    else if (pair.Program.ProcessImage != null && pair.Program.BlockRefusal == null)
+                                    {
+                                        <form method="post" asp-controller="Responses" asp-action="Create"
+                                              data-confirm="Block @pair.Program.Name from using the internet until you unblock it?">
+                                            <input type="hidden" name="actionType" value="@ResponseActionType.BlockProgram" />
+                                            <input type="hidden" name="target" value="@pair.Program.ProcessImage.ImagePath" />
+                                            <input type="hidden" name="durationMinutes" value="0" />
+                                            <input type="hidden" name="returnUrl" value="@(returnUrl + "#away")" />
+                                            <button type="submit" class="btn btn-sm sw-block-button" title="Block @pair.Program.Name from the internet">Block program</button>
+                                        </form>
+                                    }
+                                    @if (pair.Destination.ActiveBlockId != null)
+                                    {
+                                        <span class="small text-body-secondary">Address blocked</span>
+                                    }
+                                    else if (pair.Destination.BlockRefusal == null)
+                                    {
+                                        <form method="post" asp-controller="Responses" asp-action="Create"
+                                              data-confirm="Block @pair.Destination.IpAddress (@destinationName) for every program? Other sites on the same address may stop working too.">
+                                            <input type="hidden" name="actionType" value="@ResponseActionType.BlockAddress" />
+                                            <input type="hidden" name="target" value="@pair.Destination.IpAddress" />
+                                            <input type="hidden" name="durationMinutes" value="0" />
+                                            <input type="hidden" name="returnUrl" value="@(returnUrl + "#away")" />
+                                            <button type="submit" class="btn btn-sm sw-block-button" title="Block all traffic with @pair.Destination.IpAddress">Block address</button>
+                                        </form>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (away.Periods.Count > 0)
+    {
+        <h2 class="h6 px-3 mt-4 mb-2">Recent times you were away</h2>
+        <ul class="list-unstyled mb-0 sw-away-periods">
+            @foreach (var periodSummary in away.Periods)
+            {
+                var period = periodSummary.Period;
+                <li>
+                    <details>
+                        <summary class="d-flex flex-wrap align-items-baseline gap-2 px-3 py-2">
+                            <span>@Display.Time(period.StartedAt) &rarr; @(period.IsOpen ? new Microsoft.AspNetCore.Html.HtmlString("now") : Display.Time(period.EndedAt))</span>
+                            <span class="text-body-secondary small">@Display.Duration(period.Duration)</span>
+                            <span class="ms-auto small text-nowrap" title="To and from the internet">&uarr; <strong>@Display.Bytes(periodSummary.BytesSent)</strong> &nbsp; &darr; @Display.Bytes(periodSummary.BytesReceived)</span>
+                        </summary>
+                        <div class="px-3 pb-3">
+                            <div class="small text-body-secondary mb-1">
+                                Noticed @Display.Time(period.NoticedAt) after @Model.Response.IdleMinutes minutes without keyboard or mouse; traffic from the last input on counts as away. Source: @period.Source.
+                            </div>
+                            @if (periodSummary.TopPairs.Count == 0)
+                            {
+                                <div class="small">Nothing was sent or received.</div>
+                            }
+                            else
+                            {
+                                <ul class="list-unstyled small m-0">
+                                    @foreach (var pair in periodSummary.TopPairs)
+                                    {
+                                        <li class="d-flex flex-wrap justify-content-between gap-2 py-1 border-bottom">
+                                            <span>
+                                                <a asp-controller="Programs" asp-action="Details" asp-route-id="@pair.Program.ProcessImageId">@pair.Program.Name</a>
+                                                &rarr;
+                                                <a asp-controller="Addresses" asp-action="Details" asp-route-id="@pair.Destination.IpAddress">@(pair.Destination.Hostname ?? pair.Destination.IpAddress)</a>
+                                                <span class="text-body-secondary">(@pair.Destination.LocationDisplay)</span>
+                                            </span>
+                                            <span class="text-nowrap">&uarr; @Display.Bytes(pair.BytesSent) &nbsp; &darr; @Display.Bytes(pair.BytesReceived)</span>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </details>
+                </li>
+            }
+        </ul>
+    }
+</div>

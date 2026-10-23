@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - ScoutWall</title>
+    <link rel="icon" href="~/favicon.ico" sizes="any" />
+    <link rel="icon" href="~/img/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="~/img/apple-touch-icon.png" />
+    <link rel="manifest" href="~/site.webmanifest" />
+    <meta name="theme-color" content="#2a78d6" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <script src="~/js/theme.js" asp-append-version="true"></script>
+</head>
+<body>
+    @{
+        var controllerName = ViewContext.RouteData.Values["controller"]?.ToString();
+        var isSignedIn = User.Identity?.IsAuthenticated == true && !UserSession.MustChangePassword(User) && controllerName != "Setup";
+        string NavClass(string name) => controllerName == name ? "nav-link active" : "nav-link";
+        var advancedControllers = new[] { "Dashboard", "Analyst", "Traffic", "Verdicts", "Decryption", "Responses", "Audit", "Addresses" };
+        var isAdvanced = advancedControllers.Contains(controllerName) || (controllerName == "Settings" && ViewContext.RouteData.Values["action"]?.ToString() == "Index");
+    }
+    <header>
+        <nav class="navbar navbar-expand-lg sw-navbar border-bottom">
+            <div class="container-fluid">
+                <a class="navbar-brand fw-semibold" asp-controller="Home" asp-action="Index">
+                    <img src="~/img/scout-mark.png" alt="" class="sw-brand-mark" width="32" height="32" /> ScoutWall
+                </a>
+                @if (isSignedIn)
+                {
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavigation"
+                            aria-controls="mainNavigation" aria-expanded="false" aria-label="Toggle navigation">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <div class="collapse navbar-collapse" id="mainNavigation">
+                        <ul class="navbar-nav me-auto">
+                            <li class="nav-item"><a class="@NavClass("Home")" asp-controller="Home" asp-action="Index">Home</a></li>
+                            <li class="nav-item"><a class="@NavClass("Chat")" asp-controller="Chat" asp-action="Index">Ask ScoutWall</a></li>
+                            <li class="nav-item"><a class="@NavClass("Programs")" asp-controller="Programs" asp-action="Index">Data Flow</a></li>
+                            <li class="nav-item"><a class="@NavClass("System")" asp-controller="System" asp-action="Index">System</a></li>
+                            <li class="nav-item"><a class="@NavClass("Io")" asp-controller="Io" asp-action="Index">I/O</a></li>
+                            <li class="nav-item"><a class="@NavClass("Alerts")" asp-controller="Alerts" asp-action="Index">Alerts</a></li>
+                            <li class="nav-item"><a class="@(controllerName == "Settings" && !isAdvanced ? "nav-link active" : "nav-link")" asp-controller="Settings" asp-action="Simple">Settings</a></li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle @(isAdvanced ? "active" : "")" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Advanced</a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" asp-controller="Dashboard" asp-action="Index">Network overview</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Analyst" asp-action="Index">Assistant's reviews</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Traffic" asp-action="Index">Traffic</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Verdicts" asp-action="Index">Flow analysis</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Decryption" asp-action="Index">TLS &amp; decryption</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Responses" asp-action="Index">Blocks</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Audit" asp-action="Index">Audit log</a></li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><a class="dropdown-item" asp-controller="Settings" asp-action="Index">All settings</a></li>
+                                </ul>
+                            </li>
+                        </ul>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-theme-toggle title="Switch light or dark theme">Theme</button>
+                            <span class="small text-body-secondary d-none d-xl-inline">@User.Identity?.Name</span>
+                            <form method="post" asp-controller="Account" asp-action="Logout" class="m-0">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">Sign out</button>
+                            </form>
+                        </div>
+                    </div>
+                }
+            </div>
+        </nav>
+    </header>
+
+    <main role="main" class="container-fluid px-3 px-lg-4 py-4">
+        @if (TempData["Message"] is string message)
+        {
+            <div class="alert alert-success" role="status">@message</div>
+        }
+        @if (TempData["Error"] is string error)
+        {
+            <div class="alert alert-danger" role="alert">@error</div>
+        }
+        @RenderBody()
+    </main>
+
+    <footer class="border-top py-3 small text-body-secondary">
+        <div class="container-fluid px-3 px-lg-4">ScoutWall &middot; times shown in your local time zone</div>
+    </footer>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/chart.js/chart.umd.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

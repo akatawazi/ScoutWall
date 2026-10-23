@@ -1,0 +1,182 @@
+@model AlertsPage
+@{
+    ViewData["Title"] = "Alerts";
+    var alertFilter = Model.Filter;
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var groups = new (AlertGroup? Group, string Label, string Description)[]
+    {
+        (null, "All", "Everything that needs watching"),
+        (AlertGroup.System, "System", "This computer: new services and tasks, sign-ins, antivirus, crashes"),
+        (AlertGroup.Data, "Data", "Data leaving this computer"),
+        (AlertGroup.Network, "Network", "Scans, blocked or risky addresses, exposed services")
+    };
+}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h3 m-0">Alerts</h1>
+        <div class="text-body-secondary small">Serious problems with this computer, its data and its network, with what you can do about each.</div>
+    </div>
+</div>
+
+<ul class="nav nav-pills sw-alert-groups mb-3">
+    @foreach (var (group, label, description) in groups)
+    {
+        var openCount = Model.OpenCount(group);
+        <li class="nav-item">
+            <a class="nav-link @(alertFilter.Group == group ? "active" : "")" title="@description"
+               asp-action="Index" asp-route-Group="@group" asp-route-Severity="@alertFilter.Severity" asp-route-Status="@alertFilter.Status" asp-route-Range="@alertFilter.Range">
+                @label
+                @if (openCount > 0)
+                {
+                    <span class="badge rounded-pill sw-count-badge ms-1">@openCount</span>
+                }
+            </a>
+        </li>
+    }
+</ul>
+
+<form method="get" class="card card-body mb-3">
+    <input type="hidden" name="Group" value="@alertFilter.Group" />
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-6 col-lg-2">
+            <label class="form-label small" for="severity">At least</label>
+            <select class="form-select form-select-sm" id="severity" name="Severity">
+                <option value="">Any severity</option>
+                @foreach (var severity in Enum.GetValues<AlertSeverity>().Reverse())
+                {
+                    <option value="@severity" selected="@(alertFilter.Severity == severity)">@severity</option>
+                }
+            </select>
+        </div>
+        <div class="col-sm-6 col-lg-2">
+            <label class="form-label small" for="status">Status</label>
+            <select class="form-select form-select-sm" id="status" name="Status">
+                <option value="">Any</option>
+                @foreach (var status in Enum.GetValues<AlertStatus>())
+                {
+                    <option value="@status" selected="@(alertFilter.Status == status)">@status</option>
+                }
+            </select>
+        </div>
+        <div class="col-sm-6 col-lg-2">
+            <label class="form-label small" for="range">Time range</label>
+            <select class="form-select form-select-sm" id="range" name="Range">
+                @foreach (var timeRange in TimeRange.All)
+                {
+                    <option value="@timeRange.Key" selected="@(alertFilter.TimeRange.Key == timeRange.Key)">@timeRange.Label</option>
+                }
+            </select>
+        </div>
+        <div class="col-sm-6 col-lg-4">
+            <label class="form-label small" for="search">Search</label>
+            <input class="form-control form-control-sm" id="search" name="Search" value="@alertFilter.Search" placeholder="Address, rule or title" />
+        </div>
+        <div class="col-lg-2">
+            <button type="submit" class="btn btn-sm btn-primary w-100">Filter</button>
+        </div>
+    </div>
+</form>
+
+@if (Model.Alerts.Count == 0)
+{
+    <div class="card card-body text-body-secondary">Nothing here. Quiet is good.</div>
+}
+else
+{
+    <div class="card">
+        <ul class="list-group list-group-flush">
+            @foreach (var alert in Model.Alerts)
+            {
+                var programName = alert.ProcessPath == null ? null : System.IO.Path.GetFileName(alert.ProcessPath);
+                <li class="list-group-item sw-alert-row sw-severity-@alert.Severity.ToString().ToLowerInvariant()">
+                    <div class="d-flex flex-wrap justify-content-between gap-2">
+                        <div class="flex-grow-1" style="min-width: 16rem">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <partial name="_Severity" model="alert.Severity" />
+                                <span class="badge sw-group-badge">@alert.Group</span>
+                                <a asp-action="Details" asp-route-id="@alert.Id" class="fw-semibold">@alert.Title</a>
+                                <span class="badge @alert.StatusBadgeClass">@alert.Status</span>
+                            </div>
+                            <div class="small mt-1 @(alert.AnalystNote == null ? "text-body-secondary" : "")">@Display.Truncate(alert.AnalystNote ?? alert.Description, 320)</div>
+                            <div class="small text-body-secondary mt-1">
+                                @if (alert.IsHostEvent)
+                                {
+                                    <span>This computer</span>
+                                }
+                                else
+                                {
+                                    <a asp-controller="Addresses" asp-action="Details" asp-route-id="@alert.SourceIp" class="sw-mono">@alert.SourceIp</a>
+                                }
+                                @if (programName != null)
+                                {
+                                    <span> &middot; <span class="sw-mono">@programName</span></span>
+                                }
+                                &middot; @(alert.OccurrenceCount == 1 ? "once" : $"{alert.OccurrenceCount} times") &middot; last @Display.Time(alert.LastSeenAt)
+                            </div>
+                            @if (alert.HostActionTargets.Count > 0)
+                            {
+                                <div class="mt-2">
+                                    <partial name="_HostActions" model="new HostActionPanel(alert.HostActionTargets, false, returnUrl)" />
+                                </div>
+                            }
+                        </div>
+                        <div class="d-flex flex-wrap align-items-start gap-1">
+                            @if (alert.SourceCanBeBlocked)
+                            {
+                                <form method="post" asp-controller="Responses" asp-action="Create"
+                                      data-confirm="Block all traffic to and from @alert.SourceIp for 7 days?">
+                                    <input type="hidden" name="actionType" value="@ResponseActionType.BlockAddress" />
+                                    <input type="hidden" name="target" value="@alert.SourceIp" />
+                                    <input type="hidden" name="durationMinutes" value="10080" />
+                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                    <button type="submit" class="btn btn-sm sw-block-button sw-danger">Block address</button>
+                                </form>
+                            }
+                            @if (alert.SourceIsProbingLocalDevice)
+                            {
+                                <form method="post" asp-controller="Responses" asp-action="Create"
+                                      data-confirm="Stop @alert.SourceIp from connecting to this computer? This computer can still reach it (printing, casting and so on keep working).">
+                                    <input type="hidden" name="actionType" value="@ResponseActionType.BlockAddress" />
+                                    <input type="hidden" name="target" value="@alert.SourceIp" />
+                                    <input type="hidden" name="durationMinutes" value="0" />
+                                    <input type="hidden" name="inboundOnly" value="true" />
+                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                    <button type="submit" class="btn btn-sm sw-block-button sw-danger">Block this device</button>
+                                </form>
+                            }
+                            @if (programName != null && !alert.IsHostEvent)
+                            {
+                                <form method="post" asp-controller="Responses" asp-action="Create"
+                                      data-confirm="Block @programName from the internet until you unblock it?">
+                                    <input type="hidden" name="actionType" value="@ResponseActionType.BlockProgram" />
+                                    <input type="hidden" name="target" value="@alert.ProcessPath" />
+                                    <input type="hidden" name="durationMinutes" value="0" />
+                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                    <button type="submit" class="btn btn-sm sw-block-button sw-danger">Block program</button>
+                                </form>
+                            }
+                            @if (alert.Status == AlertStatus.Open)
+                            {
+                                <form method="post" asp-action="Acknowledge" asp-route-id="@alert.Id">
+                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                    <button type="submit" class="btn btn-sm sw-block-button" title="I've seen this; keep it but stop counting it as new">Seen</button>
+                                </form>
+                            }
+                            @if (alert.Status != AlertStatus.Resolved)
+                            {
+                                <form method="post" asp-action="Resolve" asp-route-id="@alert.Id">
+                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                    <button type="submit" class="btn btn-sm sw-block-button" title="Dealt with; close it">Close</button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                </li>
+            }
+        </ul>
+    </div>
+    @if (Model.Alerts.Count >= AlertFilter.MaximumResults)
+    {
+        <p class="small text-body-secondary mt-2">Showing the newest @AlertFilter.MaximumResults alerts. Narrow the filter to see others.</p>
+    }
+}
