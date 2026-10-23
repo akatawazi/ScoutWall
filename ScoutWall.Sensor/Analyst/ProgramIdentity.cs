@@ -4,7 +4,9 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace ScoutWall.Sensor.Analyst;
 
-public record ProgramFileInfo(string Fingerprint, long Size, DateTime LastWriteUtc, string? Publisher, string? Company, string? Product, string? Description, string? Version);
+/// <param name="PublisherVerified">Windows verified the signature, either embedded or through a system catalog.</param>
+public record ProgramFileInfo(string Fingerprint, long Size, DateTime LastWriteUtc, string? Publisher, bool PublisherVerified, string? Company, string? Product,
+    string? Description, string? Version);
 
 /// <summary>
 /// Identifies a program build (size and timestamp) and reads its publisher information, so a remembered
@@ -42,11 +44,13 @@ public static class ProgramIdentity
                 return null;
 
             var versionInfo = FileVersionInfo.GetVersionInfo(imagePath);
+            var signature = CodeSignature.Verify(imagePath);
             return new ProgramFileInfo(
                 $"{fileInfo.Length:x}-{fileInfo.LastWriteTimeUtc.Ticks:x}",
                 fileInfo.Length,
                 fileInfo.LastWriteTimeUtc,
-                ReadPublisher(imagePath),
+                signature?.Signer ?? ReadPublisher(imagePath),
+                signature != null,
                 versionInfo.CompanyName,
                 versionInfo.ProductName,
                 versionInfo.FileDescription,
@@ -59,8 +63,8 @@ public static class ProgramIdentity
     }
 
     /// <summary>
-    /// The subject of the embedded Authenticode certificate. This shows who signed the file; it does not verify
-    /// the signature chain, so the analyst treats it as a hint alongside the path and behaviour.
+    /// The subject of the embedded Authenticode certificate, for files whose signature Windows didn't verify (or
+    /// off Windows). It shows who claims to have signed the file, so it is only a hint alongside the path and behaviour.
     /// </summary>
     private static string? ReadPublisher(string imagePath)
     {

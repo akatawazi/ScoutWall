@@ -18,7 +18,7 @@
         var controllerName = ViewContext.RouteData.Values["controller"]?.ToString();
         var isSignedIn = User.Identity?.IsAuthenticated == true && !UserSession.MustChangePassword(User) && controllerName != "Setup";
         string NavClass(string name) => controllerName == name ? "nav-link active" : "nav-link";
-        var advancedControllers = new[] { "Dashboard", "Analyst", "Traffic", "Verdicts", "Decryption", "Responses", "Audit", "Addresses" };
+        var advancedControllers = new[] { "Dashboard", "Analyst", "Traffic", "Verdicts", "Decryption", "Responses", "Audit", "Addresses", "Updates" };
         var isAdvanced = advancedControllers.Contains(controllerName) || (controllerName == "Settings" && ViewContext.RouteData.Values["action"]?.ToString() == "Index");
     }
     <header>
@@ -54,6 +54,7 @@
                                     <li><a class="dropdown-item" asp-controller="Audit" asp-action="Index">Audit log</a></li>
                                     <li><hr class="dropdown-divider" /></li>
                                     <li><a class="dropdown-item" asp-controller="Settings" asp-action="Index">All settings</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Updates" asp-action="Index">Check for updates</a></li>
                                 </ul>
                             </li>
                         </ul>
@@ -87,7 +88,15 @@
     </main>
 
     <footer class="border-top py-3 small text-body-secondary">
-        <div class="container-fluid px-3 px-lg-4">ScoutWall &middot; times shown in your local time zone</div>
+        <div class="container-fluid px-3 px-lg-4 d-flex flex-wrap align-items-center gap-2">
+            <span>ScoutWall @ScoutWall.Data.ScoutWallVersion.Current &middot; times shown in your local time zone</span>
+            @if (isSignedIn)
+            {
+                <form method="post" asp-controller="Updates" asp-action="Check" class="d-inline">
+                    <button type="submit" class="btn btn-sm btn-link p-0 align-baseline">Check for updates</button>
+                </form>
+            }
+        </div>
     </footer>
 
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>

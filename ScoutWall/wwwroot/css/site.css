@@ -905,3 +905,27 @@ thead tr + tr th {
     color: var(--sw-series-1);
     font-weight: 600;
 }
+
+/* What a changed file holds: the owner's documents, photos and music stand out; routine program files recede. */
+.sw-badge-data {
+    background: color-mix(in srgb, var(--sw-series-1) 14%, transparent);
+    border: 1px solid var(--sw-series-1);
+    color: var(--sw-series-1);
+    font-weight: 600;
+}
+
+.sw-row-routine > td {
+    opacity: 0.6;
+}
+
+/* Long tables show their first rows; the rest wait behind "Show more". */
+tr.sw-row-collapsed {
+    display: none;
+}
+
+.sw-table-more {
+    display: flex;
+    justify-content: center;
+    padding: 0.4rem;
+    border-top: 1px solid var(--bs-border-color);
+}

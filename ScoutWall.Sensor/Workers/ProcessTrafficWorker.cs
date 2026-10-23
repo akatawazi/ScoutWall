@@ -79,7 +79,7 @@ public class ProcessTrafficWorker : BackgroundService
         {
             var programFileInfo = Analyst.ProgramIdentity.Read(processImage.ImagePath);
             await ProcessImage.SaveIdentity(dataContext, processImage.Id, programFileInfo?.Description, programFileInfo?.Publisher,
-                programFileInfo?.Company, programFileInfo?.Product, programFileInfo?.Version);
+                programFileInfo?.PublisherVerified == true, programFileInfo?.Company, programFileInfo?.Product, programFileInfo?.Version);
         }
     }
 

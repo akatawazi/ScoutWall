@@ -1,4 +1,4 @@
-// ScoutWall client behaviour: theme toggle, local times, confirmations, auto refresh, sortable tables, the map and charts.
+// ScoutWall client behaviour: theme toggle, local times, confirmations, auto refresh, sortable tables that show their first ten rows, the map and charts.
 (function () {
     "use strict";
 
@@ -239,6 +239,7 @@
                 });
                 rows.forEach(function (row) { body.appendChild(row); });
                 headings.forEach(function (other) { other.setAttribute("aria-sort", other === heading ? (descending ? "descending" : "ascending") : "none"); });
+                table.dispatchEvent(new CustomEvent("scoutwall:sorted"));
             }
 
             headings.forEach(function (heading, position) {
@@ -277,6 +278,90 @@
                 }
             }
         });
+    }
+
+    // Long tables show their first ten rows with "Show more" underneath, so no page opens on a wall of rows.
+    // Sorting picks the first ten again in the new order; an expanded table stays expanded across auto refresh.
+    // A table can opt out with data-no-limit.
+    var tableRowLimit = 10;
+
+    function initializeTableLimits() {
+        document.querySelectorAll("table").forEach(function (table, position) {
+            var body = table.tBodies[0];
+            if (!body || table.hasAttribute("data-no-limit") || body.rows.length <= tableRowLimit) {
+                return;
+            }
+
+            var storageKey = "scoutwall-expanded-" + window.location.pathname + "-" + (table.getAttribute("data-sortable") || position);
+            var expanded = false;
+            try {
+                expanded = sessionStorage.getItem(storageKey) === "true";
+            } catch (error) {
+                expanded = false;
+            }
+
+            var bar = document.createElement("div");
+            bar.className = "sw-table-more";
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "btn btn-sm btn-link";
+            bar.appendChild(button);
+            var container = table.parentElement && table.parentElement.classList.contains("table-responsive") ? table.parentElement : table;
+            container.insertAdjacentElement("afterend", bar);
+
+            function apply() {
+                Array.prototype.forEach.call(body.rows, function (row, index) {
+                    row.classList.toggle("sw-row-collapsed", !expanded && index >= tableRowLimit);
+                });
+                button.textContent = expanded ? "Show fewer" : "Show " + (body.rows.length - tableRowLimit) + " more";
+                button.setAttribute("aria-expanded", expanded ? "true" : "false");
+            }
+
+            button.addEventListener("click", function () {
+                expanded = !expanded;
+                try {
+                    sessionStorage.setItem(storageKey, expanded ? "true" : "false");
+                } catch (error) {
+                    // Storage unavailable; the table simply starts collapsed next time.
+                }
+                apply();
+                if (!expanded) {
+                    container.scrollIntoView({ block: "nearest" });
+                }
+            });
+            table.addEventListener("scoutwall:sorted", apply);
+            apply();
+        });
+    }
+
+    // While an update check or install is under way, follow it and reload when it is done. The console itself
+    // restarts during an install, so failed requests just mean "try again in a moment".
+    function initializeUpdatePolling() {
+        var element = document.querySelector("[data-update-poll]");
+        if (!element) {
+            return;
+        }
+
+        var url = element.getAttribute("data-update-poll");
+        function poll() {
+            fetch(url, { cache: "no-store", credentials: "same-origin" })
+                .then(function (response) { return response.ok ? response.json() : null; })
+                .then(function (status) {
+                    if (status && !status.busy) {
+                        window.location.reload();
+                        return;
+                    }
+                    if (status && status.message) {
+                        var text = element.querySelector("span:last-child");
+                        if (text) {
+                            text.textContent = status.message;
+                        }
+                    }
+                    window.setTimeout(poll, 3000);
+                })
+                .catch(function () { window.setTimeout(poll, 3000); });
+        }
+        window.setTimeout(poll, 2000);
     }
 
     // Map dots carry their description in data-map-label; it follows the pointer and is read by keyboard focus.
@@ -355,6 +440,8 @@
         initializeBusyForms();
         initializeAutoRefresh();
         initializeSortableTables();
+        initializeTableLimits();
+        initializeUpdatePolling();
         initializePresenceStrips();
         initializeMapTooltips();
         renderCharts();

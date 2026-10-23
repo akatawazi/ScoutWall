@@ -66,10 +66,10 @@ public class IoReport
             Space = await DriveSpaceSnapshot.Load(dataContext),
             LatestDisks = await DiskIoMinute.GetLatest(dataContext),
             Timeline = await DiskIoMinute.GetTimeline(dataContext, since, range.StepSeconds),
-            FileTotals = await FileChange.GetTotals(dataContext, since, filter.Scope),
-            BusiestFolders = await FileChange.GetBusiestFolders(dataContext, since, 10, filter.Scope),
+            FileTotals = await FileChange.GetTotals(dataContext, since, filter.Scope, filter.ShowRoutine),
+            BusiestFolders = await FileChange.GetBusiestFolders(dataContext, since, 30, filter.Scope, filter.ShowRoutine),
             Changes = await FileChange.Search(dataContext, filter, since, ChangeLimit),
-            Programs = await BuildPrograms(dataContext, since, filter.Scope),
+            Programs = await BuildPrograms(dataContext, since, filter),
             Readers = await FileChange.GetReaders(dataContext, since, 20),
             Tracking = await Setting.Load<FileTrackingSettings>(dataContext),
             TrackingRevision = await Setting.GetRevision<FileTrackingSettings>(dataContext),
@@ -83,14 +83,14 @@ public class IoReport
         return ioReport;
     }
 
-    private static async Task<List<ProgramIoSummary>> BuildPrograms(DataContext dataContext, long since, FileScope scope)
+    private static async Task<List<ProgramIoSummary>> BuildPrograms(DataContext dataContext, long since, FileChangeFilter filter)
     {
         var io = await dataContext.Set<ProcessResourceSample>().AsNoTracking()
             .Where(sample => sample.BucketStart >= since)
             .GroupBy(sample => sample.ProcessImageId)
             .Select(group => new { ProcessImageId = group.Key, Read = group.Sum(sample => sample.ReadBytes), Write = group.Sum(sample => sample.WriteBytes) })
             .ToListAsync();
-        var fileCounts = await FileChange.CountByProgram(dataContext, since, scope);
+        var fileCounts = await FileChange.CountByProgram(dataContext, since, filter.Scope, filter.ShowRoutine);
 
         var programs = io.Select(row => row.ProcessImageId).Union(fileCounts.Keys)
             .Select(id =>

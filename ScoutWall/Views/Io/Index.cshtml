@@ -38,13 +38,25 @@
     <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
         <span class="small text-body-secondary">Files to show:</span>
         <div class="btn-group btn-group-sm" role="group" aria-label="Which files to show">
-            <a class="btn @(scope == FileScope.Mine ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-scope="@FileScope.Mine"
+            <a class="btn @(scope == FileScope.Mine ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-scope="@FileScope.Mine" asp-route-routine="@Model.Filter.ShowRoutine"
                title="Your own files: Documents, Desktop, Downloads, Pictures and other personal folders">My files</a>
-            <a class="btn @(scope == FileScope.System ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-scope="@FileScope.System"
+            <a class="btn @(scope == FileScope.System ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-scope="@FileScope.System" asp-route-routine="@Model.Filter.ShowRoutine"
                title="Windows, Program Files, app data and everything else">System files</a>
-            <a class="btn @(scope == FileScope.All ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-scope="@FileScope.All">All</a>
+            <a class="btn @(scope == FileScope.All ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-scope="@FileScope.All" asp-route-routine="@Model.Filter.ShowRoutine">All</a>
         </div>
         <span class="small text-body-secondary">Applies to the file counts, programs, folders and changed files below.</span>
+        <span class="small text-body-secondary ms-md-auto">
+            @if (Model.Filter.ShowRoutine)
+            {
+                <span>Showing routine program and system files.</span>
+                <a asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-scope="@scope">Hide them</a>
+            }
+            else if (Model.FileTotals.RoutineHidden > 0)
+            {
+                <span>@Display.Number(Model.FileTotals.RoutineHidden) routine changes hidden (DLLs, programs, logs, installer copies).</span>
+                <a asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-scope="@scope" asp-route-routine="true" title="Installs and updates replace these all the time">Show them</a>
+            }
+        </span>
     </div>
 
     @foreach (var alert in Model.FileAlerts)
@@ -94,6 +106,12 @@
                     {
                         <br /><strong>@Display.Number(Model.FileTotals.ExtensionChanges) renamed to a different extension</strong>
                     }
+                    <br />
+                    <a asp-action="Index" asp-route-range="@Model.Range.Key" asp-route-scope="@scope" asp-route-data="true" asp-fragment="files"
+                       class="@(Model.FileTotals.DataDeleted > 0 ? "text-danger fw-semibold" : "")"
+                       title="Documents, spreadsheets, photos, music, video, mail and other files with your data in them">
+                        @Display.Number(Model.FileTotals.DataChanged) documents, photos and other data files@(Model.FileTotals.DataDeleted > 0 ? $", {Display.Number(Model.FileTotals.DataDeleted)} deleted" : "")
+                    </a>
                 </div>
             </div>
         </div>
@@ -416,6 +434,7 @@
             <form method="get" asp-action="Index" asp-fragment="files" class="row g-2 align-items-end">
                 <input type="hidden" name="range" value="@Model.Range.Key" />
                 <input type="hidden" name="scope" value="@scope" />
+                <input type="hidden" name="routine" value="@(Model.Filter.ShowRoutine ? "true" : "false")" />
                 <div class="col-md-4">
                     <label class="form-label small mb-1" for="file-text">File or folder contains</label>
                     <input class="form-control form-control-sm" id="file-text" name="text" value="@Model.Filter.Text" placeholder="e.g. Documents or .docx" />
@@ -441,6 +460,10 @@
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="file-data" name="data" value="true" checked="@Model.Filter.DataOnly" />
+                        <label class="form-check-label small" for="file-data" title="Documents, spreadsheets, photos, music, video, mail">Data files only</label>
+                    </div>
                     <div class="form-check mb-1">
                         <input class="form-check-input" type="checkbox" id="file-important" name="important" value="true" checked="@Model.Filter.ImportantOnly" />
                         <label class="form-check-label small" for="file-important">Important folders only</label>
@@ -451,7 +474,8 @@
                 </div>
             </form>
             <p class="small text-body-secondary mt-2 mb-0">
-                Newest first@(Model.ChangesTruncated ? ", showing the latest 300; narrow the search to see others" : "").
+                Deleted or renamed data files first, then your other data files, then everything else, newest first@(Model.ChangesTruncated ? "; the latest 300 changes are searched, narrow the search to see others" : "").
+                @(Model.Filter.ShowRoutine ? "" : "Routine program and system files (DLLs, programs, logs) are hidden.")
                 The program is known for created, deleted, renamed and read files. Very busy cache and log folders are left out.
             </p>
         </div>
@@ -476,13 +500,18 @@
                     <tbody>
                         @foreach (var change in Model.Changes)
                         {
-                            <tr class="@(change.ChangedExtension ? "sw-row-warning" : "")">
+                            var rowClass = change.ChangedExtension || change.NeedsAttention ? "sw-row-warning" : change.FileKind == FileKind.Routine ? "sw-row-routine" : "";
+                            <tr class="@rowClass">
                                 <td class="small text-nowrap" data-sort-value="@change.BucketStart">@Display.Time(change.ChangedAt)</td>
                                 <td data-sort-value="@change.Kind"><span class="sw-change @KindClass(change.Kind)">@change.Kind</span></td>
                                 <td class="small text-nowrap" data-sort-value="@change.Area"><span class="sw-area sw-area-@change.Area.ToString().ToLowerInvariant()">@FileAreaRules.Label(change.Area)</span></td>
                                 <td data-sort-value="@change.Path">
                                     <div class="sw-truncate" title="@change.Path">
                                         @System.IO.Path.GetFileName(change.Path)
+                                        @if (change.FileKind == FileKind.Data)
+                                        {
+                                            <span class="badge sw-badge-data ms-1" title="A document, photo, song or other file with your data in it">Your data</span>
+                                        }
                                         @if (change.IsImportant)
                                         {
                                             <span class="badge sw-badge-important ms-1">Important</span>

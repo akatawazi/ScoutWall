@@ -253,6 +253,20 @@ public class FileChange : Repository<FileChange>
     public bool ChangedExtension => Kind == FileChangeKind.Renamed && IsExtensionChange(OldPath, Path);
 
     /// <summary>
+    /// What the file holds. For renames, the old name says it better ("report.docx" renamed to "report.docx.locked").
+    /// </summary>
+    [NotMapped]
+    public FileKind FileKind => Kind == FileChangeKind.Renamed && OldPath != null && FileKinds.Classify(OldPath) != FileKind.Other
+        ? FileKinds.Classify(OldPath)
+        : FileKinds.FromExtension(Extension);
+
+    /// <summary>
+    /// One of the owner's documents, photos or other data files was deleted or given a new extension.
+    /// </summary>
+    [NotMapped]
+    public bool NeedsAttention => FileKind == FileKind.Data && (Kind == FileChangeKind.Deleted || ChangedExtension);
+
+    /// <summary>
     /// Extensions that appear in ordinary saves and downloads (Office saves through .tmp, browsers through .crdownload).
     /// </summary>
     public static readonly IReadOnlySet<string> TransientExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -317,7 +331,10 @@ public class FileChange : Repository<FileChange>
 
     public static async Task<List<FileChange>> Search(DataContext dataContext, FileChangeFilter filter, long sinceUnixSeconds, int limit)
     {
-        var query = InScope(Query(dataContext).Where(change => change.BucketStart >= sinceUnixSeconds), filter.Scope);
+        var query = Visible(Query(dataContext).Where(change => change.BucketStart >= sinceUnixSeconds), filter.Scope, filter.ShowRoutine);
+        // Renames are kept for the moment: "song.mp3" renamed to "song.mp3.locked" is a data file, judged below.
+        if (filter.DataOnly)
+            query = query.Where(change => FileKinds.DataExtensionList.Contains(change.Extension) || (change.Kind == FileChangeKind.Renamed && change.OldPath != null));
         if (!string.IsNullOrWhiteSpace(filter.Text))
             query = query.Where(change => EF.Functions.Like(change.Path, $"%{filter.Text.Trim()}%"));
         if (filter.Kind.HasValue)
@@ -333,6 +350,15 @@ public class FileChange : Repository<FileChange>
             .Take(limit)
             .ToListAsync();
 
+        // Deleted and scrambled data files first, then the rest of the owner's data, newest first within each.
+        changes = changes
+            .Where(change => !filter.DataOnly || change.FileKind == FileKind.Data)
+            .OrderByDescending(change => change.NeedsAttention)
+            .ThenByDescending(change => change.FileKind == FileKind.Data)
+            .ThenByDescending(change => change.BucketStart)
+            .ThenBy(change => change.Path)
+            .ToList();
+
         var imageIds = changes.Select(change => change.ProcessImageId).OfType<long>().Distinct().ToList();
         var images = (await ProcessImage.GetAll(dataContext, image => imageIds.Contains(image.Id))).ToDictionary(image => image.Id);
         foreach (var change in changes)
@@ -341,17 +367,32 @@ public class FileChange : Repository<FileChange>
         return changes;
     }
 
-    public static async Task<FileChangeTotals> GetTotals(DataContext dataContext, long sinceUnixSeconds, FileScope scope)
+    public static async Task<FileChangeTotals> GetTotals(DataContext dataContext, long sinceUnixSeconds, FileScope scope, bool showRoutine)
     {
-        var byKind = await InScope(Query(dataContext), scope)
-            .Where(change => change.BucketStart >= sinceUnixSeconds)
+        var inRange = InScope(Query(dataContext), scope).Where(change => change.BucketStart >= sinceUnixSeconds);
+        var visible = Visible(inRange, FileScope.All, showRoutine);
+        var byKind = await visible
             .GroupBy(change => change.Kind)
             .Select(group => new { Kind = group.Key, Count = group.Sum(change => change.ChangeCount), Files = group.Count() })
             .ToListAsync();
-        var renamedExtensions = await InScope(Query(dataContext), scope)
-            .Where(change => change.BucketStart >= sinceUnixSeconds && change.Kind == FileChangeKind.Renamed && change.OldPath != null)
+        var renamedExtensions = await visible
+            .Where(change => change.Kind == FileChangeKind.Renamed && change.OldPath != null)
             .Select(change => new { change.Path, change.OldPath })
             .ToListAsync();
+        var dataByKind = await inRange
+            .Where(change => change.Kind != FileChangeKind.Read && change.Kind != FileChangeKind.Renamed && FileKinds.DataExtensionList.Contains(change.Extension))
+            .GroupBy(change => change.Kind)
+            .Select(group => new { Kind = group.Key, Files = group.Count() })
+            .ToListAsync();
+
+        // A renamed file counts as data when either name is a data file, so "song.mp3" → "song.mp3.locked" counts.
+        var dataRenamed = (await inRange
+                .Where(change => change.Kind == FileChangeKind.Renamed)
+                .Select(change => new { change.Path, change.OldPath })
+                .ToListAsync())
+            .Count(row => FileKinds.Classify(row.Path) == FileKind.Data || FileKinds.Classify(row.OldPath) == FileKind.Data);
+        var routineHidden = showRoutine ? 0 : await inRange
+            .CountAsync(change => change.Kind != FileChangeKind.Read && FileKinds.RoutineExtensionList.Contains(change.Extension));
 
         return new FileChangeTotals
         {
@@ -360,16 +401,19 @@ public class FileChange : Repository<FileChange>
             Deleted = byKind.Where(row => row.Kind == FileChangeKind.Deleted).Sum(row => row.Files),
             Renamed = byKind.Where(row => row.Kind == FileChangeKind.Renamed).Sum(row => row.Files),
             Read = byKind.Where(row => row.Kind == FileChangeKind.Read).Sum(row => row.Files),
-            ExtensionChanges = renamedExtensions.Count(row => IsExtensionChange(row.OldPath, row.Path))
+            ExtensionChanges = renamedExtensions.Count(row => IsExtensionChange(row.OldPath, row.Path)),
+            DataChanged = dataByKind.Sum(row => row.Files) + dataRenamed,
+            DataDeleted = dataByKind.Where(row => row.Kind == FileChangeKind.Deleted).Sum(row => row.Files),
+            RoutineHidden = routineHidden
         };
     }
 
     /// <summary>
     /// The folders with the most changed files.
     /// </summary>
-    public static async Task<List<FolderActivity>> GetBusiestFolders(DataContext dataContext, long sinceUnixSeconds, int count, FileScope scope)
+    public static async Task<List<FolderActivity>> GetBusiestFolders(DataContext dataContext, long sinceUnixSeconds, int count, FileScope scope, bool showRoutine)
     {
-        return await InScope(Query(dataContext), scope)
+        return await Visible(Query(dataContext), scope, showRoutine)
             .Where(change => change.BucketStart >= sinceUnixSeconds && change.Kind != FileChangeKind.Read)
             .GroupBy(change => change.Folder)
             .Select(group => new FolderActivity
@@ -387,9 +431,9 @@ public class FileChange : Repository<FileChange>
     /// <summary>
     /// Files each program created, deleted or renamed, for the per-program table.
     /// </summary>
-    public static async Task<Dictionary<long, (int Created, int Deleted, int Renamed)>> CountByProgram(DataContext dataContext, long sinceUnixSeconds, FileScope scope)
+    public static async Task<Dictionary<long, (int Created, int Deleted, int Renamed)>> CountByProgram(DataContext dataContext, long sinceUnixSeconds, FileScope scope, bool showRoutine)
     {
-        var rows = await InScope(Query(dataContext), scope)
+        var rows = await Visible(Query(dataContext), scope, showRoutine)
             .Where(change => change.BucketStart >= sinceUnixSeconds && change.ProcessImageId != null)
             .GroupBy(change => new { change.ProcessImageId, change.Kind })
             .Select(group => new { group.Key.ProcessImageId, group.Key.Kind, Files = group.Count() })
@@ -462,6 +506,16 @@ public class FileChange : Repository<FileChange>
         };
     }
 
+    /// <summary>
+    /// The scope, without routine program and system files (DLLs, executables, logs, installer rollback copies)
+    /// unless they were asked for.
+    /// </summary>
+    public static IQueryable<FileChange> Visible(IQueryable<FileChange> query, FileScope scope, bool showRoutine)
+    {
+        query = InScope(query, scope);
+        return showRoutine ? query : query.Where(change => !FileKinds.RoutineExtensionList.Contains(change.Extension));
+    }
+
     public static async Task<int> DeleteBefore(DataContext dataContext, long cutoffUnixSeconds)
     {
         return await DeleteWhere(dataContext, change => change.BucketStart < cutoffUnixSeconds);
@@ -495,6 +549,16 @@ public class FileChangeFilter
     public FileChangeKind? Kind { get; set; }
     public long? ProcessImageId { get; set; }
     public bool ImportantOnly { get; set; }
+
+    /// <summary>
+    /// Only documents, photos, music and other data files.
+    /// </summary>
+    public bool DataOnly { get; set; }
+
+    /// <summary>
+    /// Include DLLs, executables, logs and other files that installs and updates replace all the time.
+    /// </summary>
+    public bool ShowRoutine { get; set; }
 }
 
 public class FileChangeTotals
@@ -505,6 +569,17 @@ public class FileChangeTotals
     public int Renamed { get; set; }
     public int Read { get; set; }
     public int ExtensionChanges { get; set; }
+
+    /// <summary>
+    /// Documents, photos, music and other data files created, changed, deleted or renamed (in the scope, never hidden).
+    /// </summary>
+    public int DataChanged { get; set; }
+    public int DataDeleted { get; set; }
+
+    /// <summary>
+    /// Changes to routine program and system files left out of everything else.
+    /// </summary>
+    public int RoutineHidden { get; set; }
 
     public int Total => Created + Modified + Deleted + Renamed;
 }

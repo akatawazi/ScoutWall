@@ -67,8 +67,19 @@
                     }
                     @if (Model.ProcessPath != null)
                     {
+                        var programFileInfo = ScoutWall.Sensor.Analyst.ProgramIdentity.Read(Model.ProcessPath);
                         <dt class="col-sm-4">Program</dt>
-                        <dd class="col-sm-8 sw-mono text-break">@Model.ProcessPath</dd>
+                        <dd class="col-sm-8">
+                            <div class="sw-mono text-break">@Model.ProcessPath</div>
+                            @if (programFileInfo?.PublisherVerified == true)
+                            {
+                                <div class="small">Signed by <strong>@programFileInfo.Publisher</strong>, verified by Windows</div>
+                            }
+                            else if (programFileInfo != null)
+                            {
+                                <div class="small text-danger">No signature Windows could verify@(programFileInfo.Publisher != null ? $" (claims to be from {programFileInfo.Publisher})" : "")</div>
+                            }
+                        </dd>
                     }
                     <dt class="col-sm-4">First seen</dt>
                     <dd class="col-sm-8">@Display.Time(Model.CreatedAt)</dd>

@@ -1,5 +1,6 @@
 using ScoutWall.Data;
 using ScoutWall.Data.Models;
+using ScoutWall.Sensor.Analyst;
 using ScoutWall.Sensor.Response;
 
 namespace ScoutWall.Sensor.Workers;
@@ -37,6 +38,7 @@ public class AlertWorker : BackgroundService
     {
         try
         {
+            DescribeSignature(alert);
             await using var dataContext = sensorRuntime.CreateDataContext();
             var aggregationWindow = TimeSpan.FromMinutes(sensorRuntime.Configuration.Detection.AlertAggregationMinutes);
             var savedAlert = await Alert.Raise(dataContext, alert, aggregationWindow);
@@ -61,6 +63,27 @@ public class AlertWorker : BackgroundService
         {
             logger.LogError(exception, "Handling alert {Title} failed", alert.Title);
         }
+    }
+
+    /// <summary>
+    /// Says whether Windows verified who made the program an alert names (its own signature or Microsoft's catalog
+    /// of Windows files), so an alert never casts doubt on a genuine Windows program without saying it is genuine.
+    /// </summary>
+    private static void DescribeSignature(Alert alert)
+    {
+        if (alert.ProcessPath == null || !OperatingSystem.IsWindows())
+            return;
+
+        var programFileInfo = ProgramIdentity.Read(alert.ProcessPath);
+        if (programFileInfo == null)
+            return;
+
+        var name = Path.GetFileName(alert.ProcessPath);
+        var sentence = programFileInfo.PublisherVerified
+            ? $" Windows verified that {name} is genuine software signed by {programFileInfo.Publisher}."
+            : $" {name} has no signature Windows could verify{(programFileInfo.Publisher != null ? $" (it claims to be from {programFileInfo.Publisher})" : string.Empty)}.";
+        if (alert.Description.Length + sentence.Length <= 2000)
+            alert.Description += sentence;
     }
 
     private async Task QueueNotifications(DataContext dataContext, Alert alert)

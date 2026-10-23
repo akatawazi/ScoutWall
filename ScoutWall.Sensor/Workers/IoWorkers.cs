@@ -3,6 +3,7 @@ using System.Security.AccessControl;
 using System.Text.Json;
 using ScoutWall.Data;
 using ScoutWall.Data.Models;
+using ScoutWall.Sensor.Analyst;
 using ScoutWall.Sensor.SystemHealth;
 
 namespace ScoutWall.Sensor.Workers;
@@ -73,10 +74,13 @@ public class DiskActivityWorker : SensorWorker
 /// Reads every NTFS drive's change journal, records which files were created, changed, deleted and renamed (and by
 /// which program, where known), and raises the two file-activity alerts:
 /// <list type="bullet">
-/// <item>FileExtensionRenames (High): many files renamed to one new extension from several old ones, which is how
-/// ransomware leaves files. Raised to Critical when nobody is at the computer.</item>
-/// <item>MassFileChange (Medium): one program changing hundreds of personal files within two minutes. High when
-/// nobody is at the computer. Sync and backup programs are left out.</item>
+/// <item>FileExtensionRenames (High): many files renamed to one new extension from several old ones, or a handful of
+/// documents, photos or music given a new extension, which is how ransomware leaves files. Raised to Critical when
+/// nobody is at the computer. Installs and updates by verified, signed programs that leave the owner's data alone
+/// are not reported.</item>
+/// <item>MassFileChange (Medium): one program changing hundreds of personal files, or deleting dozens of data files,
+/// within two minutes. High when nobody is at the computer or data files were deleted. Sync and backup programs
+/// are left out.</item>
 /// </list>
 /// Nothing is ended or blocked automatically; the alerts offer End and Block from running.
 /// </summary>
@@ -89,6 +93,8 @@ public class FileActivityWorker : SensorWorker
     private static readonly TimeSpan AlertCooldown = TimeSpan.FromMinutes(30);
     private const int RenameThreshold = 30;
     private const int MassChangeThreshold = 200;
+    private const int DataRenameThreshold = 10;
+    private const int DataDeleteThreshold = 50;
 
     /// <summary>
     /// Programs whose job is to change many files: sync clients, backup and version control.
@@ -114,14 +120,15 @@ public class FileActivityWorker : SensorWorker
         "pagefile.sys", "hiberfil.sys", "swapfile.sys", "DumpStack.log.tmp"
     };
 
+    private const string WindowsInstallerRollbackFolder = @":\Config.Msi\";
+
     private static readonly TimeSpan RulesInterval = TimeSpan.FromMinutes(10);
 
     /// <summary>
     /// Build output and version control churn through thousands of files; they never count toward MassFileChange.
     /// </summary>
     private static readonly string[] BuildFragments =
-        [@"in", @"\obj", @"
-ode_modules", @"\.git", @"\.vs", @"\packages", @"\.nuget", @"	arget", @"\dist", @"\__pycache__"];
+        [@"\bin\", @"\obj\", @"\node_modules\", @"\.git\", @"\.vs\", @"\packages\", @"\.nuget\", @"\target\", @"\dist\", @"\__pycache__\"];
 
     private static readonly HashSet<string> BuildPrograms = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -270,9 +277,13 @@ ode_modules", @"\.git", @"\.vs", @"\packages", @"\.nuget", @"	arget", @"\dist", 
     {
         var away = SensorRuntime.Idle.IsIdle == true;
 
-        // Many files renamed to the same new extension, coming from several different ones.
+        // Many files renamed to the same new extension, coming from several different ones. Windows Installer moves
+        // every file it replaces into Config.Msi as a .rbf rollback copy, which looks the same, so those are left out,
+        // and so are program files (DLLs, executables) that updates set aside before replacing them.
         var extensionRenames = recent
-            .Where(entry => entry.Change.Kind == FileChangeKind.Renamed && entry.Change.OldPath != null)
+            .Where(entry => entry.Change.Kind == FileChangeKind.Renamed && entry.Change.OldPath != null
+                && !entry.Change.Path.Contains(WindowsInstallerRollbackFolder, StringComparison.OrdinalIgnoreCase)
+                && FileKinds.Classify(entry.Change.OldPath) != FileKind.Routine)
             .Select(entry => (entry, OldExtension: Path.GetExtension(entry.Change.OldPath!), NewExtension: Path.GetExtension(entry.Change.Path)))
             .Where(rename => FileChange.IsExtensionChange(rename.entry.Change.OldPath, rename.entry.Change.Path))
             .GroupBy(rename => rename.NewExtension.ToLowerInvariant());
@@ -280,24 +291,47 @@ ode_modules", @"\.git", @"\.vs", @"\packages", @"\.nuget", @"	arget", @"\dist", 
         {
             var files = group.Select(rename => rename.entry.Change.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count();
             var oldExtensions = group.Select(rename => rename.OldExtension.ToLowerInvariant()).Distinct().Count();
-            if (files < RenameThreshold || oldExtensions < 2)
+
+            // Documents, photos and music given an extension that isn't a document, photo or song is what scrambled
+            // files look like, even when they were all one kind (a folder of .docx files), so fewer are enough.
+            var dataFiles = group.Where(rename => FileKinds.Classify(rename.entry.Change.OldPath) == FileKind.Data)
+                .Select(rename => rename.entry.Change.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+            var scrambledData = dataFiles >= DataRenameThreshold && FileKinds.FromExtension(group.Key) != FileKind.Data;
+            if (!scrambledData && (files < RenameThreshold || oldExtensions < 2))
                 continue;
 
             var program = group.Select(rename => rename.entry.ImagePath).OfType<string>().GroupBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .OrderByDescending(paths => paths.Count()).FirstOrDefault()?.Key;
             var programName = program == null ? "An unknown program" : Path.GetFileName(program);
-            var examples = group.Take(3).Select(rename => $"{Path.GetFileName(rename.entry.Change.OldPath)} → {Path.GetFileName(rename.entry.Change.Path)}");
+
+            // A program installed where only administrators can write, with a signature Windows verifies, renaming
+            // files outside the owner's own folders is installing or updating software. Ransomware wants the owner's
+            // data; when that is touched the alert is still raised, because an installer runs whatever custom code
+            // the package brings inside msiexec.exe.
+            var signer = TrustedSigner(program);
+            var touchesMyFiles = dataFiles > 0 || group.Any(rename => areaRules.Classify(rename.entry.Change.Path) == FileArea.MyFiles);
+            if (signer != null && !touchesMyFiles)
+                continue;
+
+            // Data files first in the examples: they are what the owner will recognise.
+            var examples = group.OrderByDescending(rename => FileKinds.Classify(rename.entry.Change.OldPath) == FileKind.Data).Take(3)
+                .Select(rename => $"{Path.GetFileName(rename.entry.Change.OldPath)} → {Path.GetFileName(rename.entry.Change.Path)}");
             await Raise("FileExtensionRenames", group.Key + (program ?? string.Empty), away ? AlertSeverity.Critical : AlertSeverity.High,
                 $"{programName} renamed {files} files to {group.Key}",
                 $"{files} files were renamed to the extension {group.Key} within two minutes, from {oldExtensions} different kinds of file " +
-                $"(for example {string.Join(", ", examples)}). Ransomware leaves files like this after scrambling them. " +
+                $"(for example {string.Join(", ", examples)})" +
+                (dataFiles > 0 ? $"; {dataFiles} of them were documents, photos, music or other data files. " : ". ") +
+                "Ransomware leaves files like this after scrambling them. " +
+                (signer != null ? "The program is genuine signed software, but it renamed your own files, so check that you were installing or updating something. " : string.Empty) +
                 $"{(away ? "Nobody was at the computer. " : string.Empty)}If you didn't expect this, end the program and disconnect the computer from the network.",
-                group.Key, program, now, new { files, newExtension = group.Key, oldExtensions, examples, away });
+                group.Key, program, now, new { files, dataFiles, newExtension = group.Key, oldExtensions, examples, away, signer });
         }
 
-        // One program changing a large number of personal files.
+        // One program changing a large number of personal files, or deleting a good number of documents, photos and
+        // music. Program files and logs inside personal folders (a portable app, a game in Documents) don't count.
         var personalChanges = recent
             .Where(entry => areaRules.Classify(entry.Change.Path) == FileArea.MyFiles
+                && FileKinds.Classify(entry.Change.Path) != FileKind.Routine
                 && !BuildFragments.Any(fragment => entry.Change.Path.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
             .GroupBy(entry => entry.ImagePath ?? string.Empty, StringComparer.OrdinalIgnoreCase);
         foreach (var group in personalChanges)
@@ -307,19 +341,38 @@ ode_modules", @"\.git", @"\.vs", @"\packages", @"\.nuget", @"	arget", @"\dist", 
                 continue;
 
             var files = group.Select(entry => entry.Change.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count();
-            if (files < MassChangeThreshold)
+            var dataDeleted = group.Where(entry => entry.Change.Kind == FileChangeKind.Deleted && FileKinds.Classify(entry.Change.Path) == FileKind.Data)
+                .Select(entry => entry.Change.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+            if (files < MassChangeThreshold && dataDeleted < DataDeleteThreshold)
                 continue;
 
             var programName = program == null ? "Programs ScoutWall couldn't identify" : Path.GetFileName(program);
             var folders = group.Select(entry => Path.GetDirectoryName(entry.Change.Path)).Distinct(StringComparer.OrdinalIgnoreCase).Count();
             var deleted = group.Count(entry => entry.Change.Kind == FileChangeKind.Deleted);
-            await Raise("MassFileChange", program ?? "(unknown)", away ? AlertSeverity.High : AlertSeverity.Medium,
-                $"{programName} changed {files} personal files in two minutes",
+            var dataFiles = group.Where(entry => FileKinds.Classify(entry.Change.Path) == FileKind.Data)
+                .Select(entry => entry.Change.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+            await Raise("MassFileChange", program ?? "(unknown)", away || dataDeleted >= DataDeleteThreshold ? AlertSeverity.High : AlertSeverity.Medium,
+                dataDeleted >= DataDeleteThreshold
+                    ? $"{programName} deleted {dataDeleted} of your documents, photos or other data files"
+                    : $"{programName} changed {files} personal files in two minutes",
                 $"{files} of your own files (Documents, Desktop, Pictures and the like) across {folders} folders were changed, " +
                 $"{deleted} of them deleted, within two minutes{(away ? ", while nobody was at the computer" : string.Empty)}. " +
-                "Copying or syncing a folder does this too; if you weren't doing that, look at the I/O page.",
-                programName, program, now, new { files, folders, deleted, away });
+                $"{dataFiles} were documents, photos, music or other data files ({dataDeleted} deleted). " +
+                "Copying, moving or syncing a folder does this too; if you weren't doing that, look at the I/O page and check the Recycle Bin.",
+                programName, program, now, new { files, dataFiles, folders, deleted, dataDeleted, away });
         }
+    }
+
+    /// <summary>
+    /// Who signed the program, when it lives in Windows or Program Files and Windows verifies the signature.
+    /// </summary>
+    private static string? TrustedSigner(string? programPath)
+    {
+        if (programPath == null || !TrustedPaths.IsInProtectedFolder(programPath))
+            return null;
+
+        var programFileInfo = ProgramIdentity.Read(programPath);
+        return programFileInfo is { PublisherVerified: true } ? programFileInfo.Publisher : null;
     }
 
     private async Task Raise(string rule, string key, AlertSeverity severity, string title, string description, string subject, string? programPath, DateTime now, object details)

@@ -7,8 +7,11 @@
     <div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2" role="status">
         <div>
             <strong>ScoutWall @latestRelease.Version is available</strong> (you have @ScoutWall.Data.ScoutWallVersion.Current).
-            To update, run <code>scoutwall update</code> as administrator (Windows) or <code>sudo scoutwall update</code> (Linux). Your data and settings are kept.
+            Your data and settings are kept.
         </div>
-        <a class="btn btn-sm btn-outline-primary" href="@latestRelease.Url" target="_blank" rel="noopener">What's new</a>
+        <div class="d-flex gap-2">
+            <a class="btn btn-sm btn-outline-primary" href="@latestRelease.Url" target="_blank" rel="noopener">What's new</a>
+            <a class="btn btn-sm btn-primary" asp-controller="Updates" asp-action="Index">Install update</a>
+        </div>
     </div>
 }

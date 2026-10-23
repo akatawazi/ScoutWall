@@ -40,6 +40,13 @@ public class ProcessImage : Repository<ProcessImage>
     [MaxLength(256)]
     public string? Publisher { get; set; }
 
+    /// <summary>
+    /// Windows verified the publisher's signature, embedded in the file or through Microsoft's catalog of Windows
+    /// files. When false, Publisher is only what the file claims.
+    /// </summary>
+    [Column("publisher_verified")]
+    public bool PublisherVerified { get; set; }
+
     [Column("company")]
     [MaxLength(256)]
     public string? Company { get; set; }
@@ -76,13 +83,15 @@ public class ProcessImage : Repository<ProcessImage>
             .ToListAsync();
     }
 
-    public static async Task SaveIdentity(DataContext dataContext, long id, string? friendlyName, string? publisher, string? company, string? productName, string? fileVersion)
+    public static async Task SaveIdentity(DataContext dataContext, long id, string? friendlyName, string? publisher, bool publisherVerified, string? company,
+        string? productName, string? fileVersion)
     {
         await dataContext.ProcessImages
             .Where(processImage => processImage.Id == id)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(processImage => processImage.FriendlyName, Limit(friendlyName))
                 .SetProperty(processImage => processImage.Publisher, Limit(publisher))
+                .SetProperty(processImage => processImage.PublisherVerified, publisherVerified)
                 .SetProperty(processImage => processImage.Company, Limit(company))
                 .SetProperty(processImage => processImage.ProductName, Limit(productName))
                 .SetProperty(processImage => processImage.FileVersion, Limit(fileVersion, 64))

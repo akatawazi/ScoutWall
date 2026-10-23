@@ -12,9 +12,12 @@ namespace ScoutWall.Controllers;
 public class IoController : Controller
 {
     public async Task<IActionResult> Index(string? range, FileScope scope, string? text, FileChangeKind? kind, long? program, bool important,
-        [FromServices] DataContext dataContext)
+        bool data, bool routine, [FromServices] DataContext dataContext)
     {
-        var filter = new FileChangeFilter { Scope = scope, Text = text, Kind = kind, ProcessImageId = program, ImportantOnly = important };
+        var filter = new FileChangeFilter
+        {
+            Scope = scope, Text = text, Kind = kind, ProcessImageId = program, ImportantOnly = important, DataOnly = data, ShowRoutine = routine
+        };
         var ioReport = await IoReport.Build(dataContext, TimeRange.Parse(range), filter);
         return View(ioReport);
     }

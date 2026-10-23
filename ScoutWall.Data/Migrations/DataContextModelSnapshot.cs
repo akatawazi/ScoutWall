@@ -1082,6 +1082,10 @@ namespace ScoutWall.Data.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("publisher");
 
+                    b.Property<bool>("PublisherVerified")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("publisher_verified");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ImagePath")

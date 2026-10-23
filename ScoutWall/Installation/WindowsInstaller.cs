@@ -281,6 +281,14 @@ public static class WindowsInstaller
     /// </summary>
     private static void StartPresenceForCurrentUser(int port)
     {
+        // Installed from the console's "Install update", the installer runs as SYSTEM, which has no desktop to
+        // show the agent on; it starts again at each person's next sign-in.
+        if (System.Security.Principal.WindowsIdentity.GetCurrent().IsSystem)
+        {
+            Installer.Step("Scout appears in the notification area after your next sign-in");
+            return;
+        }
+
         try
         {
             Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "runas.exe"),

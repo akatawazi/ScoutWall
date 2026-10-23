@@ -11,8 +11,8 @@ namespace ScoutWall.Sensor.SystemHealth;
 /// <summary>
 /// Gathers what runs on this computer or starts with it (programs, services, scheduled tasks, startup entries)
 /// and scores each one on plain warning signs. Only items with real warning signs are kept; the assistant then
-/// gives its view on those. Windows' own files are catalog-signed, which the signature check can't see, so
-/// "unknown publisher" is never counted against anything in the Windows folder.
+/// gives its view on those. A few files Windows ships aren't in any catalog, so "unknown publisher" is never
+/// counted against anything in the Windows folder.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public static partial class ScanCollector

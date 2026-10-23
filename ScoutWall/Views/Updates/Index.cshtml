@@ -1,0 +1,72 @@
+@model ScoutWall.Controllers.UpdatesPage
+@using ScoutWall.Data
+@{
+    ViewData["Title"] = "Updates";
+    var latest = Model.LatestRelease;
+    var status = Model.Status;
+    var busy = status?.IsBusy == true;
+    var available = latest?.IsNewerThanRunning == true;
+    var statusClass = status?.Progress switch
+    {
+        UpdateProgress.Failed => "alert-danger",
+        UpdateProgress.Available => "alert-info",
+        UpdateProgress.UpToDate or UpdateProgress.Installed => "alert-success",
+        _ => "alert-secondary"
+    };
+}
+<h1 class="h3 mb-3">Updates</h1>
+
+<div class="card" style="max-width: 44rem">
+    <div class="card-body">
+        <dl class="row mb-3">
+            <dt class="col-sm-4">Running</dt>
+            <dd class="col-sm-8">ScoutWall @ScoutWallVersion.Current</dd>
+            <dt class="col-sm-4">Newest release</dt>
+            <dd class="col-sm-8">
+                @if (latest == null)
+                {
+                    <span class="text-body-secondary">Not checked yet</span>
+                }
+                else
+                {
+                    <span>@latest.Version</span>
+                    @if (!string.IsNullOrEmpty(latest.Url))
+                    {
+                        <a class="ms-2 small" href="@latest.Url" target="_blank" rel="noopener">What's new</a>
+                    }
+                    <div class="small text-body-secondary">Checked @Display.Time(latest.CheckedAt)</div>
+                }
+            </dd>
+        </dl>
+
+        @if (status != null && (busy || DateTime.UtcNow - status.At < TimeSpan.FromHours(24)))
+        {
+            <div class="alert @statusClass d-flex align-items-center gap-2" role="status" data-update-poll="@(busy ? Url.Action("Status") : null)">
+                @if (busy)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                <span>@status.Message</span>
+            </div>
+        }
+
+        <div class="d-flex flex-wrap gap-2">
+            <form method="post" asp-action="Check" data-busy-text="Checking…">
+                <button type="submit" class="btn btn-outline-primary" disabled="@busy">Check for updates</button>
+            </form>
+            @if (available)
+            {
+                <form method="post" asp-action="Install" data-busy-text="Starting…"
+                      data-confirm="Install ScoutWall @latest!.Version now? Monitoring pauses for a minute while the services restart. Your data and settings are kept.">
+                    <button type="submit" class="btn btn-primary" disabled="@busy">Install @latest!.Version</button>
+                </form>
+            }
+        </div>
+
+        <p class="small text-body-secondary mt-3 mb-0">
+            Updates come from the ScoutWall releases on GitHub. The download is checked against the release's SHA-256 checksums before
+            anything is installed; your data and settings are kept. ScoutWall also checks on its own every six hours unless that is turned off
+            in Settings, Integrations.
+        </p>
+    </div>
+</div>

@@ -149,6 +149,7 @@ public class AnalystTools
         {
             friendly_name = processImage.FriendlyName,
             publisher = processImage.Publisher,
+            publisher_verified = processImage.PublisherVerified,
             company = processImage.Company,
             product = processImage.ProductName,
             version = processImage.FileVersion

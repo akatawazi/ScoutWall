@@ -7,6 +7,9 @@ using ScoutWall.Sensor.Notifications;
 using ScoutWall.Sensor.Presence;
 using ScoutWall.Sensor.Response;
 using ScoutWall.Sensor.Capture;
+using ScoutWall.Sensor.Updates;
+using System.Diagnostics;
+using System.Text.Json;
 
 namespace ScoutWall.Sensor.Workers;
 
@@ -399,50 +402,138 @@ public class MaintenanceWorker : SensorWorker
 }
 
 /// <summary>
-/// Asks GitHub every few hours for the newest ScoutWall release so the console can say when an update is out.
-/// A private repository answers "not found" without signing in, which is simply ignored.
+/// Asks GitHub every six hours for the newest ScoutWall release so the console can say when an update is out, and
+/// carries out the console's "Check for updates" and "Install update" within a few seconds of the click. Installing
+/// downloads the release, checks it against its SHA-256 checksums and starts its "install" as a separate process,
+/// which stops both services, replaces the program and starts them again; data and settings are kept.
 /// </summary>
 public class UpdateCheckWorker : SensorWorker
 {
-    private static readonly HttpClient HttpClient = CreateClient();
+    private static readonly TimeSpan ScheduledInterval = TimeSpan.FromHours(6);
+    private DateTime lastScheduledCheck = DateTime.MinValue;
+    private bool startupChecked;
 
     public UpdateCheckWorker(SensorRuntime sensorRuntime, ILogger<UpdateCheckWorker> logger) : base(sensorRuntime, logger)
     {
     }
 
-    protected override TimeSpan Interval => TimeSpan.FromHours(6);
+    protected override TimeSpan Interval => TimeSpan.FromSeconds(5);
 
     protected override async Task RunOnce(CancellationToken cancellationToken)
     {
-        if (!SensorRuntime.Configuration.Integration.CheckForUpdates)
-            return;
-
-        try
+        await using var dataContext = SensorRuntime.CreateDataContext();
+        if (!startupChecked)
         {
-            using var response = await HttpClient.GetAsync($"https://api.github.com/repos/{ScoutWallVersion.Repository}/releases/latest", cancellationToken);
-            if (!response.IsSuccessStatusCode)
-                return;
-
-            using var document = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
-            var tag = document.RootElement.GetProperty("tag_name").GetString() ?? string.Empty;
-            var url = document.RootElement.GetProperty("html_url").GetString() ?? string.Empty;
-
-            await using var dataContext = SensorRuntime.CreateDataContext();
-            await new LatestRelease { Tag = tag, Url = url, CheckedAt = DateTime.UtcNow }.Save(dataContext);
-            if (ScoutWallVersion.IsNewer(tag))
-                Logger.LogInformation("ScoutWall {Version} is available (running {Current}); run \"scoutwall update\" to install it", tag, ScoutWallVersion.Current);
+            startupChecked = true;
+            await ReportFinishedInstall(dataContext);
         }
-        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or KeyNotFoundException)
+
+        var request = await UpdateRequest.Load(dataContext);
+        if (request != null)
         {
-            Logger.LogDebug("Update check failed: {Message}", exception.Message);
+            await UpdateRequest.Clear(dataContext);
+            Logger.LogInformation("{Action} requested by {User} in the console", request.Action == UpdateAction.Install ? "Update install" : "Update check", request.RequestedBy);
+            await Check(dataContext, request.Action == UpdateAction.Install, quiet: false, cancellationToken);
+            return;
+        }
+
+        if (SensorRuntime.Configuration.Integration.CheckForUpdates && DateTime.UtcNow - lastScheduledCheck >= ScheduledInterval)
+        {
+            lastScheduledCheck = DateTime.UtcNow;
+            await Check(dataContext, install: false, quiet: true, cancellationToken);
         }
     }
 
-    private static HttpClient CreateClient()
+    private async Task Check(DataContext dataContext, bool install, bool quiet, CancellationToken cancellationToken)
     {
-        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd($"ScoutWall/{ScoutWallVersion.Current}");
-        client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
-        return client;
+        if (!quiet)
+            await UpdateStatus.Set(dataContext, install ? UpdateProgress.Installing : UpdateProgress.Checking, "Asking GitHub for the newest release…");
+
+        using var releaseClient = new ReleaseClient(timeout: install ? TimeSpan.FromMinutes(10) : TimeSpan.FromSeconds(30));
+        try
+        {
+            var release = await releaseClient.GetLatest(cancellationToken);
+            await new LatestRelease { Tag = release.Tag, Url = release.Url, CheckedAt = DateTime.UtcNow }.Save(dataContext);
+            if (!release.IsNewer)
+            {
+                if (!quiet)
+                    await UpdateStatus.Set(dataContext, UpdateProgress.UpToDate, $"You're up to date: {ScoutWallVersion.Current} is the newest release.");
+                return;
+            }
+
+            Logger.LogInformation("ScoutWall {Version} is available (running {Current})", release.Version, ScoutWallVersion.Current);
+            if (!install)
+            {
+                if (!quiet)
+                    await UpdateStatus.Set(dataContext, UpdateProgress.Available, $"ScoutWall {release.Version} is available (you have {ScoutWallVersion.Current}).", release.Version);
+                return;
+            }
+
+            await UpdateStatus.Set(dataContext, UpdateProgress.Installing, $"Downloading ScoutWall {release.Version}…", release.Version);
+            var downloaded = await releaseClient.DownloadVerified(release, cancellationToken);
+            await UpdateStatus.Set(dataContext, UpdateProgress.Installing,
+                $"Installing ScoutWall {release.Version}. The console restarts and is back within a minute or two.", release.Version);
+            StartInstaller(downloaded);
+            Logger.LogWarning("Installing ScoutWall {Version}; the services restart now", release.Version);
+        }
+        catch (UpdateException exception)
+        {
+            if (!quiet)
+                await UpdateStatus.Set(dataContext, UpdateProgress.Failed, exception.Message);
+            Logger.LogInformation("Update check failed: {Message}", exception.Message);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception
+            or JsonException or KeyNotFoundException or InvalidOperationException)
+        {
+            if (!quiet)
+                await UpdateStatus.Set(dataContext, UpdateProgress.Failed, $"The update didn't go through: {exception.Message}");
+            Logger.LogWarning("Update failed: {Message}", exception.Message);
+        }
+    }
+
+    /// <summary>
+    /// Starts the new version's "install" outside this service: the installer stops this service, so it must not
+    /// be a child that goes down with it. Its output goes to update.log in the data folder.
+    /// </summary>
+    private static void StartInstaller(string downloaded)
+    {
+        var log = Path.Combine(ScoutWallPaths.DataFolder, "update.log");
+        ProcessStartInfo startInfo;
+        if (OperatingSystem.IsWindows())
+        {
+            // Windows doesn't end a service's child processes when the service stops.
+            startInfo = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"), $"/c \"\"{downloaded}\" install > \"{log}\" 2>&1\"")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+        }
+        else
+        {
+            // systemd ends everything in the service's group when it stops, so the installer runs as its own unit.
+            startInfo = new ProcessStartInfo("systemd-run",
+                $"--unit=scoutwall-update-{DateTime.UtcNow:yyyyMMddHHmmss} --collect --property=StandardOutput=file:{log} --property=StandardError=file:{log} {downloaded} install")
+            {
+                UseShellExecute = false
+            };
+        }
+
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Couldn't start the installer.");
+    }
+
+    /// <summary>
+    /// After an install from the console, the new sensor says how it went.
+    /// </summary>
+    private static async Task ReportFinishedInstall(DataContext dataContext)
+    {
+        var updateStatus = await UpdateStatus.Load(dataContext);
+        if (updateStatus is not { Progress: UpdateProgress.Installing, TargetVersion: not null })
+            return;
+
+        if (!ScoutWallVersion.IsNewer(updateStatus.TargetVersion))
+            await UpdateStatus.Set(dataContext, UpdateProgress.Installed, $"Updated to ScoutWall {ScoutWallVersion.Current}.", ScoutWallVersion.Current);
+        else if (DateTime.UtcNow - updateStatus.At > TimeSpan.FromMinutes(10))
+            await UpdateStatus.Set(dataContext, UpdateProgress.Failed,
+                $"The install of {updateStatus.TargetVersion} didn't finish; still running {ScoutWallVersion.Current}. See update.log in {ScoutWallPaths.DataFolder}.");
     }
 }

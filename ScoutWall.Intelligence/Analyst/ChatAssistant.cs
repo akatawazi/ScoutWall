@@ -230,6 +230,7 @@ public class ChatAssistant
                 name = app.Name,
                 path = processImage?.ImagePath,
                 publisher = processImage?.Publisher ?? "unknown (not signed)",
+                publisher_verified = processImage?.PublisherVerified == true,
                 company = processImage?.Company,
                 bytes_sent = app.BytesSent,
                 bytes_received = app.BytesReceived,

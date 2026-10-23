@@ -138,6 +138,7 @@ public static class AnalystCaseBuilder
             {
                 path = program.ProcessImage?.ImagePath,
                 publisher = ProgramIdentity.Read(program.ProcessImage?.ImagePath)?.Publisher,
+                publisher_verified = ProgramIdentity.Read(program.ProcessImage?.ImagePath)?.PublisherVerified == true,
                 bytes_sent = program.BytesSent,
                 bytes_received = program.BytesReceived,
                 bytes_sent_while_idle = program.AwayBytesSent,
